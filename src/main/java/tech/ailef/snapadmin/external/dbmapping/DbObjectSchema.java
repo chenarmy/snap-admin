@@ -36,6 +36,7 @@ import tech.ailef.snapadmin.external.annotations.DisableEdit;
 import tech.ailef.snapadmin.external.annotations.DisableExport;
 import tech.ailef.snapadmin.external.annotations.HiddenColumn;
 import tech.ailef.snapadmin.external.dbmapping.fields.DbField;
+import tech.ailef.snapadmin.external.dbmapping.OrmType;
 import tech.ailef.snapadmin.external.dto.MappingError;
 import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
 import tech.ailef.snapadmin.external.exceptions.SnapAdminNotFoundException;
@@ -65,6 +66,12 @@ public class DbObjectSchema {
 	 */
 	private CustomJpaRepository jpaRepository;
 	
+	/**
+	 * The ORM type used by this schema (JPA or MYBATIS_PLUS)
+	 */
+	@JsonIgnore
+	private OrmType ormType = OrmType.JPA;
+	
 	private SnapAdmin snapAdmin;
 	
 	/**
@@ -81,22 +88,39 @@ public class DbObjectSchema {
 	private List<MappingError> errors = new ArrayList<>();
 	
 	/**
-	 * Initializes this schema for the specific `@Entity` class. 
-	 * Determines the table name from the `@Table` annotation and also
-	 * which methods are `@ComputedColumn`s
-	 * @param klass the `@Entity` class
+	 * Initializes this schema for the specific entity class. 
+	 * Determines the table name from the `@Table` (JPA) or `@TableName` (MyBatis-Plus) annotation 
+	 * and also which methods are `@ComputedColumn`s
+	 * @param klass the entity class
 	 * @param snapAdmin the SnapAdmin instance
 	 */
 	public DbObjectSchema(Class<?> klass, SnapAdmin snapAdmin) {
 		this.snapAdmin = snapAdmin;
 		this.entityClass = klass;
 		
-		Table tableAnnotation = klass.getAnnotation(Table.class);
-		
+		// Determine table name based on ORM type
 		String tableName = Utils.camelToSnake(getJavaClass().getSimpleName());
+		
+		// Try JPA @Table annotation first
+		Table tableAnnotation = klass.getAnnotation(Table.class);
 		if (tableAnnotation != null && tableAnnotation.name() != null
 			&& !tableAnnotation.name().isBlank()) { 
 			tableName = tableAnnotation.name();
+		} else {
+			// Try MyBatis-Plus @TableName annotation
+			try {
+				Class<?> tableNameClass = Class.forName("com.baomidou.mybatisplus.annotation.TableName");
+				Object tableNameAnnotation = klass.getAnnotation((Class<java.lang.annotation.Annotation>) tableNameClass);
+				if (tableNameAnnotation != null) {
+					java.lang.reflect.Method valueMethod = tableNameClass.getMethod("value");
+					String mpTableName = (String) valueMethod.invoke(tableNameAnnotation);
+					if (mpTableName != null && !mpTableName.isBlank()) {
+						tableName = mpTableName;
+					}
+				}
+			} catch (Exception e) {
+				// MyBatis-Plus not on classpath or other error, ignore
+			}
 		}
 
 		this.tableName = tableName;
@@ -194,8 +218,24 @@ public class DbObjectSchema {
 	}
 	
 	/**
-	 * Returns the underlying CustomJpaRepository
-	 * @return
+	 * Returns the ORM type used by this schema
+	 * @return the ORM type (JPA or MYBATIS_PLUS)
+	 */
+	public OrmType getOrmType() {
+		return ormType;
+	}
+	
+	/**
+	 * Sets the ORM type used by this schema
+	 * @param ormType the ORM type (JPA or MYBATIS_PLUS)
+	 */
+	public void setOrmType(OrmType ormType) {
+		this.ormType = ormType;
+	}
+	
+	/**
+	 * Returns the underlying CustomJpaRepository (for JPA ORM type)
+	 * @return the CustomJpaRepository
 	 */
 	public CustomJpaRepository getJpaRepository() {
 		return jpaRepository;

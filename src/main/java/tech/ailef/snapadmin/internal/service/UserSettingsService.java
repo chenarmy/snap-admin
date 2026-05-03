@@ -11,8 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import tech.ailef.snapadmin.internal.mapper.UserSettingMapper;
 import tech.ailef.snapadmin.internal.model.UserSetting;
-import tech.ailef.snapadmin.internal.repository.UserSettingsRepository;
 
 @Service
 public class UserSettingsService {
@@ -20,11 +20,12 @@ public class UserSettingsService {
 	private TransactionTemplate internalTransactionTemplate;
 	
 	@Autowired
-	private UserSettingsRepository repo;
+	private UserSettingMapper mapper;
 	
 	public UserSetting save(UserSetting q) {
 		return internalTransactionTemplate.execute((status) -> {
-			return repo.save(q);
+			mapper.insert(q);
+			return q;
 		});
 	
 	}

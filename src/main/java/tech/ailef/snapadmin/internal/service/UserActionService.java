@@ -18,9 +18,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tech.ailef.snapadmin.external.dto.LogsSearchRequest;
 import tech.ailef.snapadmin.external.dto.PaginatedResult;
 import tech.ailef.snapadmin.external.dto.PaginationInfo;
+import tech.ailef.snapadmin.internal.mapper.UserActionMapper;
 import tech.ailef.snapadmin.internal.model.UserAction;
 import tech.ailef.snapadmin.internal.repository.CustomActionRepositoryImpl;
-import tech.ailef.snapadmin.internal.repository.UserActionRepository;
 
 /**
  * Service class to retrieve user actions through the {@link CustomActionRepositoryImpl}. 
@@ -29,7 +29,7 @@ import tech.ailef.snapadmin.internal.repository.UserActionRepository;
 @Service
 public class UserActionService {
 	@Autowired
-	private UserActionRepository repo;
+	private UserActionMapper mapper;
 	
 	@Autowired
 	private CustomActionRepositoryImpl customRepo;
@@ -39,7 +39,8 @@ public class UserActionService {
 	
 	public UserAction save(UserAction a) {
 		return internalTransactionTemplate.execute(status -> {
-			return repo.save(a);
+			mapper.insert(a);
+			return a;
 		});
 	}
 	

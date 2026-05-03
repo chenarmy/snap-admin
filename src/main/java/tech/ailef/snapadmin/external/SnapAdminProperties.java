@@ -10,6 +10,8 @@ package tech.ailef.snapadmin.external;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import tech.ailef.snapadmin.external.dbmapping.OrmType;
+
 /**
  * The 'snapadmin.*' properties that can be set in the properties file
  * to configure the behaviour of Spring Boot Admin Panel. 
@@ -27,7 +29,7 @@ public class SnapAdminProperties {
 	private String baseUrl;
 
 	/**
-	 * The path of the package that contains your JPA `@Entity` classes to be scanned.
+	 * The path of the package that contains your JPA `@Entity` or MyBatis-Plus `@TableName` classes to be scanned.
 	 */
 	private String modelsPackage;
 
@@ -40,6 +42,12 @@ public class SnapAdminProperties {
 	 * Whether the SQL console feature is enabled
 	 */
 	private boolean sqlConsoleEnabled = true;
+
+	/**
+	 * The ORM type to use. Can be JPA or MYBATIS_PLUS.
+	 * Default is JPA for backward compatibility.
+	 */
+	private OrmType ormType = OrmType.JPA;
 	
 	/**
 	 * Whether SnapAdmin is enabled
@@ -91,6 +99,22 @@ public class SnapAdminProperties {
 	
 	public void setTestMode(boolean testMode) {
 		this.testMode = testMode;
+	}
+	
+	/**
+	 * Returns the ORM type to use.
+	 * @return the ORM type (JPA or MYBATIS_PLUS)
+	 */
+	public OrmType getOrmType() {
+		return ormType;
+	}
+	
+	/**
+	 * Sets the ORM type to use.
+	 * @param ormType the ORM type (JPA or MYBATIS_PLUS)
+	 */
+	public void setOrmType(OrmType ormType) {
+		this.ormType = ormType;
 	}
 	
 //	public Map<String, String> toMap() {

@@ -11,25 +11,25 @@ package tech.ailef.snapadmin.internal.model;
 
 import java.time.LocalDateTime;
 
-import org.hibernate.annotations.UuidGenerator;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
-
-@Entity
+@TableName("console_query")
 public class ConsoleQuery {
-	@Id
-	@UuidGenerator
+	@TableId(type = IdType.ASSIGN_UUID)
 	private String id;
 	
-	@Lob
+	@TableField("sql")
 	private String sql;
 	
 	private String title;
 	
+	@TableField("created_at")
 	private LocalDateTime createdAt;
 
+	@TableField("updated_at")
 	private LocalDateTime updatedAt;
 	
 	public ConsoleQuery() {

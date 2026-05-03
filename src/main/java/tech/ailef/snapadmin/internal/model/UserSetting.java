@@ -8,18 +8,19 @@
 
 package tech.ailef.snapadmin.internal.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 
 /**
  * A single variable in the user settings.
  */
-@Entity
+@TableName("user_setting")
 public class UserSetting {
 	/**
 	 * The id of the variable (its name)
 	 */
-	@Id
+	@TableId(type = IdType.INPUT)
 	private String id;
 	
 	/**

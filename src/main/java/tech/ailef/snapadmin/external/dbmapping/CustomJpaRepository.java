@@ -11,11 +11,7 @@ package tech.ailef.snapadmin.external.dbmapping;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
@@ -234,5 +230,17 @@ public class CustomJpaRepository extends SimpleJpaRepository {
 			}
         }
         return finalPredicates;
+	}
+
+	/**
+	 * Find an entity by its primary key and return it as Object (for generic use).
+	 * This method is used to resolve foreign key relationships.
+	 * @param schema the schema of the entity (unused, kept for compatibility)
+	 * @param id the primary key value
+	 * @return an Optional containing the entity as Object, or empty
+	 */
+	@SuppressWarnings("unchecked")
+	public Optional<Object> findRawById(DbObjectSchema schema, Object id) {
+		return (Optional<Object>) this.findById(id);
 	}
 }

@@ -14,8 +14,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+
+import tech.ailef.snapadmin.internal.mapper.ConsoleQueryMapper;
 import tech.ailef.snapadmin.internal.model.ConsoleQuery;
-import tech.ailef.snapadmin.internal.repository.ConsoleQueryRepository;
 
 @Service
 public class ConsoleQueryService {
@@ -23,25 +25,30 @@ public class ConsoleQueryService {
 	private TransactionTemplate internalTransactionTemplate;
 	
 	@Autowired
-	private ConsoleQueryRepository repo;
+	private ConsoleQueryMapper mapper;
 	
 	public ConsoleQuery save(ConsoleQuery q) {
 		return internalTransactionTemplate.execute((status) -> {
-			return repo.save(q);
+			if (q.getId() == null) {
+				mapper.insert(q);
+			} else {
+				mapper.updateById(q);
+			}
+			return q;
 		});
 	}
 	
 	public void delete(String id) {
 		internalTransactionTemplate.executeWithoutResult((status) -> {
-			repo.deleteById(id);
+			mapper.deleteById(id);
 		});
 	}
 	
 	public List<ConsoleQuery> findAll() {
-		return repo.findAll();
+		return mapper.selectList(null);
 	}
 	
 	public Optional<ConsoleQuery> findById(String id) {
-		return repo.findById(id);
+		return Optional.ofNullable(mapper.selectById(id));
 	}
 }

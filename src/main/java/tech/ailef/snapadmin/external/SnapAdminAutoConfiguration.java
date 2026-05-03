@@ -7,8 +7,6 @@
 
 package tech.ailef.snapadmin.external;
 
-import java.util.Properties;
-
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,33 +17,25 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.orm.jpa.JpaTransactionManager;
-import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
-import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import tech.ailef.snapadmin.internal.InternalSnapAdminConfiguration;
+import tech.ailef.snapadmin.internal.config.MyBatisPlusConfig;
 
 /**
  * The configuration class for "internal" data source. This is not the
  * source connected to the user's data/entities, but rather an internal
  * H2 database which is used by SnapAdmin to store user
  * settings and other information like operations history. 
+ * Now uses MyBatis-Plus instead of JPA.
  */
 @ConditionalOnProperty(name = "snapadmin.enabled", matchIfMissing = false)
 @ComponentScan
 @EnableConfigurationProperties(SnapAdminProperties.class)
 @Configuration
-@EnableJpaRepositories(
-	entityManagerFactoryRef = "internalEntityManagerFactory", 
-	basePackages = { "tech.ailef.snapadmin.internal.repository" }
-)
-@EnableTransactionManagement
-@Import(InternalSnapAdminConfiguration.class)
+@Import({InternalSnapAdminConfiguration.class, MyBatisPlusConfig.class})
 public class SnapAdminAutoConfiguration {
 	@Autowired
 	private SnapAdminProperties props;
@@ -70,33 +60,13 @@ public class SnapAdminAutoConfiguration {
 		return dataSourceBuilder.build();
 	}
 
-	@Bean
-	LocalContainerEntityManagerFactoryBean internalEntityManagerFactory() {
-		LocalContainerEntityManagerFactoryBean factoryBean = new LocalContainerEntityManagerFactoryBean();
-		factoryBean.setDataSource(internalDataSource());
-		factoryBean.setPersistenceUnitName("internal");
-		factoryBean.setPackagesToScan("tech.ailef.snapadmin.internal.model");
-		factoryBean.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
-		Properties properties = new Properties();
-		properties.setProperty("hibernate.dialect", "org.hibernate.dialect.H2Dialect");
-		properties.setProperty("hibernate.hbm2ddl.auto", "update");
-		factoryBean.setJpaProperties(properties);
-		factoryBean.afterPropertiesSet();
-		return factoryBean;
-	}
-
 	/**
-	 * The internal transaction manager. It is not defined as a bean
-	 * in order to avoid "colliding" with the default transactionManager
-	 * registered by the user. Internally, we use this to instantiate a
-	 * TransactionTemplate and run all transactions manually instead of
-	 * relying on the @link {@link Transactional} annotation.
+	 * The internal transaction manager for MyBatis-Plus.
 	 * @return
 	 */
+	@Bean
 	PlatformTransactionManager internalTransactionManager() {
-		JpaTransactionManager transactionManager = new JpaTransactionManager();
-		transactionManager.setEntityManagerFactory(internalEntityManagerFactory().getObject());
-		return transactionManager;
+		return new DataSourceTransactionManager(internalDataSource());
 	}
 	
 	@Bean

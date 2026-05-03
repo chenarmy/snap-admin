@@ -2,121 +2,126 @@
  * SnapAdmin - An automatically generated CRUD admin UI for Spring Boot apps
  * Copyright (C) 2023 Ailef (http://ailef.tech)
  * 
-
  */
-
 
 package tech.ailef.snapadmin.internal.repository;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
 import tech.ailef.snapadmin.external.dto.LogsSearchRequest;
 import tech.ailef.snapadmin.internal.model.UserAction;
 
 /**
- * A repository that provides custom queries for UserActions 
+ * A repository that provides custom queries for UserActions using JDBC
  */
 @Component
 public class CustomActionRepositoryImpl implements CustomActionRepository {
 
-    @PersistenceContext(unitName = "internal")
-    private EntityManager entityManager;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
     
     /**
      * Finds the UserAction that match the input search request.
-     * Implemented as a custom CriteriaQuery in order to put all the filter
-     * in an AND condition but ignore null value. The default JpaRepository
-     * behaviour is to test for equality to NULL when an AND condition is used,
-     * instead of ignoring the fields.
      */
     @Override
     public List<UserAction> findActions(LogsSearchRequest request) {
-    	String table = request.getTable();
-    	String actionType = request.getActionType();
-    	String username = request.getUsername();
-    	String itemId = request.getItemId();
-    	PageRequest page = request.toPageRequest();
-
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<UserAction> query = cb.createQuery(UserAction.class);
-        Root<UserAction> userAction = query.from(UserAction.class);
-
-        List<Predicate> predicates = new ArrayList<Predicate>();
-        if (table != null)
-            predicates.add(cb.equal(userAction.get("onTable"), table));
-        if (actionType != null)
-            predicates.add(cb.equal(userAction.get("actionType"), actionType));
-        if (itemId != null)
-        	predicates.add(cb.equal(userAction.get("primaryKey"), itemId));
-        if (username != null)
-        	predicates.add(cb.equal(userAction.get("username"), username));
+        String table = request.getTable();
+        String actionType = request.getActionType();
+        String username = request.getUsername();
+        String itemId = request.getItemId();
         
-        if (!predicates.isEmpty()) {
-            query.select(userAction)
-                 .where(cb.and(
-                            predicates.toArray(new Predicate[predicates.size()])));
+        StringBuilder sql = new StringBuilder("SELECT * FROM user_action WHERE 1=1");
+        List<Object> params = new ArrayList<>();
+        
+        if (table != null && !table.isBlank()) {
+            sql.append(" AND on_table = ?");
+            params.add(table);
+        }
+        if (actionType != null && !actionType.isBlank()) {
+            sql.append(" AND action_type = ?");
+            params.add(actionType);
+        }
+        if (itemId != null && !itemId.isBlank()) {
+            sql.append(" AND primary_key = ?");
+            params.add(itemId);
+        }
+        if (username != null && !username.isBlank()) {
+            sql.append(" AND username = ?");
+            params.add(username);
         }
         
+        // Add sorting
         if (request.getSortKey() != null) {
-        	String key = request.getSortKey();
-        	if (request.getSortOrder().equalsIgnoreCase("ASC")) {
-        		query.orderBy(cb.asc(userAction.get(key)));
-        	} else {
-        		query.orderBy(cb.desc(userAction.get(key)));
-        	}
+            sql.append(" ORDER BY ").append(request.getSortKey());
+            if ("DESC".equalsIgnoreCase(request.getSortOrder())) {
+                sql.append(" DESC");
+            } else {
+                sql.append(" ASC");
+            }
         }
         
-        return entityManager.createQuery(query)
-        			.setMaxResults(page.getPageSize())
-        			.setFirstResult((int)page.getOffset())
-        			.getResultList();
+        // Add pagination
+        int pageSize = request.getPageSize();
+        int offset = (request.getPage() - 1) * pageSize;
+        sql.append(" LIMIT ? OFFSET ?");
+        params.add(pageSize);
+        params.add(offset);
+        
+        RowMapper<UserAction> rowMapper = (rs, rowNum) -> {
+            UserAction action = new UserAction();
+            action.setId(rs.getInt("id"));
+            action.setCreatedAt(rs.getTimestamp("created_at") != null ? 
+                rs.getTimestamp("created_at").toLocalDateTime() : null);
+            action.setSql(rs.getString("sql"));
+            action.setJavaClass(rs.getString("java_class"));
+            action.setOnTable(rs.getString("on_table"));
+            action.setPrimaryKey(rs.getString("primary_key"));
+            action.setActionType(rs.getString("action_type"));
+            action.setUsername(rs.getString("username"));
+            return action;
+        };
+        
+        return jdbcTemplate.query(sql.toString(), rowMapper, params.toArray());
     }
     
     /**
      * Returns the count that match the filtering parameters, used for pagination.
-     * @return the number of user actions matching the filtering parameters
      */
     @Override
     public long countActions(LogsSearchRequest request) {
-
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-        CriteriaQuery<Long> query = cb.createQuery(Long.class);
-        Root<UserAction> userAction = query.from(UserAction.class);
-
         String table = request.getTable();
         String actionType = request.getActionType();
-        String itemId = request.getItemId();
         String username = request.getUsername();
+        String itemId = request.getItemId();
         
-        List<Predicate> predicates = new ArrayList<>();
-        if (table != null)
-            predicates.add(cb.equal(userAction.get("onTable"), table));
-        if (actionType != null)
-            predicates.add(cb.equal(userAction.get("actionType"), actionType));
-        if (itemId != null)
-        	predicates.add(cb.equal(userAction.get("primaryKey"), itemId));
-        if (username != null)
-        	predicates.add(cb.equal(userAction.get("username"), username));
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM user_action WHERE 1=1");
+        List<Object> params = new ArrayList<>();
         
-        if (!predicates.isEmpty()) {
-            query.select(cb.count(userAction))
-                 .where(cb.and(
-                            predicates.toArray(new Predicate[predicates.size()])));
-        } else {
-        	query.select(cb.count(userAction));
+        if (table != null && !table.isBlank()) {
+            sql.append(" AND on_table = ?");
+            params.add(table);
+        }
+        if (actionType != null && !actionType.isBlank()) {
+            sql.append(" AND action_type = ?");
+            params.add(actionType);
+        }
+        if (itemId != null && !itemId.isBlank()) {
+            sql.append(" AND primary_key = ?");
+            params.add(itemId);
+        }
+        if (username != null && !username.isBlank()) {
+            sql.append(" AND username = ?");
+            params.add(username);
         }
         
-        return entityManager.createQuery(query).getSingleResult();
+        Long count = jdbcTemplate.queryForObject(sql.toString(), Long.class, params.toArray());
+        return count != null ? count : 0;
     }
 
 }
