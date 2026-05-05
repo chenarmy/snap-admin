@@ -1,117 +1,219 @@
-[![javadoc](https://javadoc.io/badge2/tech.ailef/snap-admin/javadoc.svg)](https://javadoc.io/doc/tech.ailef/snap-admin) 
+# SnapAdmin - Spring Boot 数据库管理面板
 
-> The project has been recently renamed from 'Spring Boot Database Admin' to 'SnapAdmin'.
-> If you were already using 'Spring Boot Database Admin' make sure to update your `pom.xml` and other
-> references with the new updated name.
+为你的 [Spring Boot®](https://spring.io/projects/spring-boot) 应用程序快速生成一个功能强大的数据库/CRUD 管理仪表板。
 
-# SnapAdmin - Spring Boot Database Admin Panel
+SnapAdmin 会扫描你的实体类，自动为数据库架构构建带有 CRUD 操作（以及更多功能）的 Web UI。不需要修改现有代码（好吧，你只需要添加 **1 行代码**）！
 
-Generate a powerful database/CRUD management dashboard for your [Spring Boot®](https://spring.io/projects/spring-boot) application in a few minutes. 
+## 功能特性
 
-SnapAdmin scans your `@Entity` classes and automatically builds a web UI with CRUD operations (and much more)
-for your database schema. No modifications required to your existing code (well, you will need to add **1 line** to it...)!
+* 带分页和排序的对象列表
+* 创建/编辑对象
+* 操作日志：通过 Web UI 执行的所有写操作历史记录
+* 高级搜索和过滤
+* 基于注解的自定义配置
+* 数据导出（CSV、XLSX、JSONL）
+* SQL 控制台：运行、保存自定义 SQL 查询并导出结果
 
-[![Example page listing products](https://www.snapadmin.dev/img/screenshot.png)](https://www.snapadmin.dev/img/screenshot.png)
+## ORM 支持
 
-**Features:**
+SnapAdmin 支持 **MyBatis-Plus** ORM 框架：
 
- * List objects with pagination and sorting
- * Object detail page, which also includes `@OneToMany` and `@ManyToMany` related objects
- * Create/Edit objects
- * Action logs: history of all write operations executed through the web UI
- * Advanced search and filtering
- * Annotation-based customization
- * Data export (CSV, XLSX, JSONL)
- * SQL console to run, save for later use and export results of custom SQL queries
+* **MyBatis-Plus**：使用 MyBatis-Plus 注解（`@TableName`、`@TableId`、`@TableField` 等）
 
-**Supported JPA annotations**
+## 安装
 
- * Core: @Entity, @Table, @Column, @Lob, @Id, @GeneratedValue
- * Relationships: @OneToMany, @ManyToOne, @ManyToMany, @OneToOne
- * Validation: all JPA validation annotations (`jakarta.validation.constraints.*`)
+### 1. Maven 依赖
 
-The behaviour you specify with these annotations should be applied automatically by SnapAdmin as well. Keep in mind that using non-supported annotations will not necessarily result in an error, as they are simply ignored. Depending on what the annotation actually does, this could be just fine or result in an error if it interferes with something that SnapAdmin relies on.
-
-**Supported field types**
-
-These are the supported types for fields inside your `@Entity` classes (excluding fields for relationships to other entities). Fields with unsupported types are ignored, but functionality may be limited; refer to the [documentation](https://snapadmin.dev/docs/index.html#supported-field-types) for more information.
-
- * Double, Float, Integer, Short, Byte, Character, BigDecimal, BigInteger
- * Boolean
- * String, UUID
- * Date, LocalDate, LocalDateTime, OffsetDateTime, Instant
- * byte[]
- * Enum
-
-The code is still in a very early stage and it might not be robust if you use not-yet-supported JPA annotations and/or other custom configurations (e.g., custom naming strategy). If you find a bug with your settings, please report it as an issue and I will take a look at it.
-
-## Installation
-
-1. SnapAdmin is distributed on Maven. For the latest stable release you can simply include the following snippet in your `pom.xml` file:
+SnapAdmin 通过 Maven 分发。在 `pom.xml` 中添加以下依赖：
 
 ```xml
 <dependency>
-	<groupId>tech.ailef</groupId>
-	<artifactId>snap-admin</artifactId>
-	<version>0.2.1</version>
+    <groupId>tech.ailef</groupId>
+    <artifactId>snap-admin</artifactId>
+    <version>0.2.2</version>
+</dependency>
+
+<!-- MyBatis-Plus 支持（必需） -->
+<dependency>
+    <groupId>com.baomidou</groupId>
+    <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+    <version>3.5.7</version>
 </dependency>
 ```
 
-2. A few simple configuration steps are required on your end in order to integrate the library into your project. 
-If you don't want to test on your own code, you can clone the [test project](https://github.com/aileftech/snap-admin-test) which provides
-a sample database and already configured code.
+### 2. 配置 application.properties
 
-Otherwise, go ahead and add these to your `application.properties` file:
+在你的 `application.properties` 文件中添加以下配置：
 
 ```properties
-## SnapAdmin is not enabled by default
+# 启用 SnapAdmin（默认禁用）
 snapadmin.enabled=true
 
-## The first-level part of the URL path: http://localhost:8080/${baseUrl}/
+# URL 路径前缀：http://localhost:8080/${baseUrl}/
 snapadmin.baseUrl=admin
 
-## The package(s) that contain your @Entity classes
-## accepts multiple comma separated values
-snapadmin.modelsPackage=your.models.package,your.second.models.package
+# 包含实体类的包路径（多个包用逗号分隔）
+snapadmin.modelsPackage=your.models.package
 
-## At the moment, it's required to have open-in-view set to true.
-# spring.jpa.open-in-view=true
+# ORM 类型：使用 MYBATIS_PLUS
+snapadmin.ormType=MYBATIS_PLUS
 
-## OPTIONAL PARAMETERS
+# 数据库配置（示例使用 H2 内存数据库）
+spring.datasource.url=jdbc:h2:mem:testdb
+spring.datasource.driverClassName=org.h2.Driver
+spring.datasource.username=sa
+spring.datasource.password=
 
-## Whether to enable SnapAdmin
-# snapadmin.enabled=true
-#
-## Set to true if you need to run the tests, as it will customize
-## the database configuration for the internal DataSource
-# snapadmin.testMode=false
-#
-## SQL console enable/disable (true by default)
+# MyBatis-Plus 配置
+mybatis-plus.mapper.scan=your.mapper.package
+mybatis-plus.global-config.db-config.id-type=auto
+mybatis-plus.configuration.map-underscore-to-camel-case=true
+
+# 可选参数
+
+# 是否启用 SQL 控制台（默认 true）
 # snapadmin.sqlConsoleEnabled=false
+
+# 测试模式（运行测试时需要）
+# snapadmin.testMode=false
 ```
 
-**IMPORTANT**: The configuration prefix `dbadmin.` has been changed to `snapadmin.` starting from version 0.2.0, as part of the project being renamed. Remember to update your configuration files accordingly if you were already using SnapAdmin <= 0.1.9.
+### 3. 启用自动配置
 
-Now annotate your `@SpringBootApplication` class containing the `main` method with the following:
+在你的 Spring Boot 应用主类上添加注解：
 
 ```java
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import tech.ailef.snapadmin.external.SnapAdminAutoConfiguration;
+
 @ImportAutoConfiguration(SnapAdminAutoConfiguration.class)
+@SpringBootApplication
+public class YourApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(YourApplication.class, args);
+    }
+}
 ```
 
-This will autoconfigure SnapAdmin when your application starts. You are good to go!
+### 4. 实体类注解
 
-3. At this point, when you run your application, you should be able to visit `http://localhost:${port}/${snapadmin.baseUrl}` and see the web interface.
+#### 使用 MyBatis-Plus
 
-## Documentation
+```java
+import com.baomidou.mybatisplus.annotation.*;
 
-* [Latest Javadoc](https://javadoc.io/doc/tech.ailef/snap-admin/)
-* [Reference Guide](https://snapadmin.dev/docs/)
+@TableName("users")
+public class User {
+    @TableId(type = IdType.AUTO)
+    private Integer id;
+    
+    @TableField("user_name")
+    private String userName;
+    
+    @TableField("description")
+    private String description; // 使用 @TableField 替代 @Lob
+    
+    // getters and setters
+}
+```
 
-## Issues
+#### MyBatis-Plus Mapper 接口
 
-If you find a problem or a bug, please report it as an issue. When doing so, include as much information as possible, and in particular:
+使用 MyBatis-Plus 时，需要为每个实体创建 Mapper 接口：
 
- * provide the code for the involved `@Entity` classes, if possible/relevant
- * provide the full stack trace of the error
- * specify if you are using any particular configuration either in your `application.properties` or through annotations
- * if the problem occurs at startup, enable `DEBUG`-level logs and report what `grep SnapAdmin` returns
+```java
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface UserMapper extends BaseMapper<User> {
+    // 无需编写方法，BaseMapper 提供了基本的 CRUD 操作
+}
+```
+
+### 5. 启动应用
+
+启动你的 Spring Boot 应用后，访问：`http://localhost:8080/${snapadmin.baseUrl}`
+
+默认地址：`http://localhost:8080/admin`
+
+## 支持的注解
+
+### MyBatis-Plus 注解
+* 核心：`@TableName`、`@TableId`、`@TableField`
+* ID 类型：`IdType.AUTO`、`IdType.INPUT`、`IdType.ASSIGN_ID`、`IdType.ASSIGN_UUID`
+* 验证：所有 Jakarta Validation 注解（`jakarta.validation.constraints.*`）
+
+## 支持的字段类型
+
+以下是实体类中支持的字段类型。不支持类型的字段会被忽略，但功能可能受限。
+
+* 数值：Double、Float、Integer、Short、Byte、BigDecimal、BigInteger
+* 布尔：Boolean
+* 字符串：String、UUID
+* 日期：Date、LocalDate、LocalDateTime、OffsetDateTime、Instant
+* 二进制：byte[]
+* 枚举：Enum
+
+## 内部实体类
+
+SnapAdmin 内部使用以下实体类（使用 MyBatis-Plus）：
+
+* `UserSetting` - 用户设置
+* `UserAction` - 用户操作日志
+* `ConsoleQuery` - 控制台查询
+
+这些实体位于 `tech.ailef.snapadmin.internal.model` 包中，使用 MyBatis-Plus 注解。
+
+## 项目结构
+
+```
+snap-admin/
+├── src/main/java/tech/ailef/snapadmin/
+│   ├── external/           # 外部 API 和核心功能
+│   │   ├── SnapAdmin.java           # 主类，扫描实体并构建 Schema
+│   │   ├── SnapAdminProperties.java  # 配置属性
+│   │   ├── dbmapping/              # 数据库映射核心
+│   │   │   ├── OrmType.java        # ORM 类型枚举（MYBATIS_PLUS）
+│   │   │   ├── DbObjectSchema.java  # 数据库对象 Schema
+│   │   │   ├── AnnotationUtils.java # 注解工具类（支持 MP）
+│   │   │   └── ...
+│   │   └── ...
+│   └── internal/          # 内部实现
+│       ├── model/         # 内部实体（使用 MyBatis-Plus 注解）
+│       ├── mapper/        # MyBatis-Plus Mapper 接口
+│       ├── service/       # 服务层
+│       └── config/        # 配置类
+└── src/main/resources/
+    └── application.properties  # 配置文件
+```
+
+## 文档
+
+* [最新 Javadoc](https://javadoc.io/doc/tech.ailef/snap-admin/)
+* [参考指南](https://snapadmin.dev/docs/)
+
+## 问题反馈
+
+如果你发现问题或 Bug，请提交 Issue。提交时请包含尽可能多的信息：
+
+* 提供相关实体类的代码（如果可能/相关）
+* 提供完整的错误堆栈跟踪
+* 说明你是否在 `application.properties` 中使用了特定配置或注解
+* 如果问题在启动时发生，启用 `DEBUG` 级别日志并报告 `grep SnapAdmin` 返回的信息
+* **说明你使用的 ORM 类型**（MYBATIS_PLUS）
+
+## 许可证
+
+MIT License - 详见 LICENSE 文件
+
+## 版本历史
+
+* **0.2.2** - 添加 MyBatis-Plus 支持
+* **0.2.1** - Bug 修复和性能优化
+* **0.2.0** - 项目从 "Spring Boot Database Admin" 重命名为 "SnapAdmin"
+
+---
+
+> 项目最近从 'Spring Boot Database Admin' 重命名为 'SnapAdmin'。
+> 如果你之前在使用 'Spring Boot Database Admin'，请确保更新你的 `pom.xml` 和其他引用。

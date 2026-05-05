@@ -8,7 +8,7 @@
 package tech.ailef.snapadmin.external.exceptions;
 
 /**
- * Thrown when a field of an `@Entity` class has a type that is not
+ * Thrown when a field of an entity class has a type that is not
  * supported.
  */
 public class UnsupportedFieldTypeException extends SnapAdminException {

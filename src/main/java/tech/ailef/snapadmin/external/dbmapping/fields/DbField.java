@@ -16,11 +16,6 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import tech.ailef.snapadmin.external.annotations.DisplayImage;
 import tech.ailef.snapadmin.external.annotations.Filterable;
 import tech.ailef.snapadmin.external.annotations.FilterableType;
@@ -180,6 +175,24 @@ public class DbField {
 	}
 	
 	/**
+	 * Returns if this field is a to-one relationship.
+	 * MyBatis-Plus doesn't have relationship annotations, so this always returns false.
+	 * @return
+	 */
+	public boolean isToOne() {
+		return false;
+	}
+	
+	/**
+	 * Returns if this field is a to-many relationship.
+	 * MyBatis-Plus doesn't have relationship annotations, so this always returns false.
+	 * @return
+	 */
+	public boolean isToMany() {
+		return false;
+	}
+	
+	/**
 	 * Returns the value to use in the "step" HTML attribute
 	 * for numeric data fields. For fields that are not numeric,
 	 * we just return the String "any", as it is not included
@@ -217,22 +230,14 @@ public class DbField {
 		return getPrimitiveField().getAnnotation(ReadOnly.class) != null;
 	}
 	
-	public boolean isToOne() {
-		return  (getPrimitiveField().getAnnotation(OneToOne.class) != null &&
-				getPrimitiveField().getAnnotation(OneToOne.class).mappedBy().isBlank())
-				|| getPrimitiveField().getAnnotation(ManyToOne.class) != null;
-	}
-	
 	/**
 	 * Returns if this field is settable with a raw value, i.e.
 	 * a field that is not a relationship to another entity;
+	 * Since MyBatis-Plus doesn't have relationship annotations, this always returns true.
 	 * @return
 	 */
 	public boolean isSettable() {
-		return getPrimitiveField().getAnnotation(ManyToOne.class) == null
-			&& getPrimitiveField().getAnnotation(OneToMany.class) == null
-			&& getPrimitiveField().getAnnotation(OneToOne.class) == null
-			&& getPrimitiveField().getAnnotation(ManyToMany.class) == null;
+		return true;
 	}
 	
 	/**
@@ -246,7 +251,8 @@ public class DbField {
 	
 	
 	public boolean isGeneratedValue() {
-		return getPrimitiveField().getAnnotation(GeneratedValue.class) != null;
+		return tech.ailef.snapadmin.external.dbmapping.AnnotationUtils.isGeneratedValue(
+			getPrimitiveField(), getSchema().getOrmType());
 	}
 	
 	public Set<DbFieldValue> getAllValues() {
@@ -256,7 +262,7 @@ public class DbField {
 				return new DbFieldValue(v, this);
 			}).collect(Collectors.toSet());
 		} else {
-			List<?> findAll = schema.getJpaRepository().findAll();
+			List<?> findAll = schema.getRepository().findAllList(schema);
 			return findAll.stream()
 						.map(o -> new DbObject(o, schema).get(this))
 						.collect(Collectors.toSet());

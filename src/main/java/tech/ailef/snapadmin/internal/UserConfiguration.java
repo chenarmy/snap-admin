@@ -16,17 +16,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
+import tech.ailef.snapadmin.internal.mapper.UserSettingMapper;
 import tech.ailef.snapadmin.internal.model.UserSetting;
-import tech.ailef.snapadmin.internal.repository.UserSettingsRepository;
 
 /**
- * Wrapper class for the UserSettingsRepository that provides a better
+ * Wrapper class for user settings persistence that provides a better
  * way of handling user settings. 
  */
 @Component
 public class UserConfiguration {
 	@Autowired
-	private UserSettingsRepository repo;
+	private UserSettingMapper mapper;
 	
 	/**
 	 * Returns the value of the specific setting
@@ -34,7 +34,7 @@ public class UserConfiguration {
 	 * @return	the value, if found, otherwise the default value if present, otherwise an empty string
 	 */
 	public String get(String settingName) {
-		Optional<UserSetting> setting = repo.findById(settingName);
+		Optional<UserSetting> setting = Optional.ofNullable(mapper.selectById(settingName));
 		if (setting.isPresent())
 			return setting.get().getSettingValue();
 		String settingDefaultValue = defaultValues().get(settingName);

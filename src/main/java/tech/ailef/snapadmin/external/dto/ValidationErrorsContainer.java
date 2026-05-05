@@ -16,7 +16,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 
 /**
- * Holds information about JPA validation errors occurring during
+ * Holds information about validation errors occurring during
  * creation or editing of items.
  */
 public class ValidationErrorsContainer {

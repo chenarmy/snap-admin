@@ -9,7 +9,6 @@ package tech.ailef.snapadmin.external.dbmapping.fields;
 
 import java.util.List;
 
-import jakarta.persistence.OneToOne;
 import tech.ailef.snapadmin.external.dto.CompareOperator;
 import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
 
@@ -26,7 +25,7 @@ public class OneToOneFieldType extends DbFieldType {
 
 	@Override
 	public Class<?> getJavaClass() {
-		return OneToOne.class;
+		return Object.class;
 	}
 	
 	@Override

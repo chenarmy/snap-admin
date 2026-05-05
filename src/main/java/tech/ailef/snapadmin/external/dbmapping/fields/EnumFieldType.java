@@ -13,19 +13,15 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import jakarta.persistence.EnumType;
 import tech.ailef.snapadmin.external.dto.CompareOperator;
 import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
 
 public class EnumFieldType extends DbFieldType {
 
-	private EnumType type;
-	
 	private Class<?> klass;
 	
-	public EnumFieldType(Class<?> klass, EnumType type) {
+	public EnumFieldType(Class<?> klass) {
 		this.klass = klass;
-		this.type = type;
 	}
 	
 	@Override
@@ -70,9 +66,5 @@ public class EnumFieldType extends DbFieldType {
 	@Override
 	public List<CompareOperator> getCompareOperators() {
 		return List.of(CompareOperator.EQ);
-	}
-	
-	public EnumType getType() {
-		return type;
 	}
 }

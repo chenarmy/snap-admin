@@ -11,7 +11,6 @@ package tech.ailef.snapadmin.internal.service;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -50,14 +49,12 @@ public class UserActionService {
 	 * @return a page of results matching the input request
 	 */
 	public PaginatedResult<UserAction> findActions(LogsSearchRequest request) {
-		PageRequest page = request.toPageRequest();
-		
 		long count = customRepo.countActions(request);
 		List<UserAction> actions = customRepo.findActions(request);
-		int maxPage = (int)(Math.ceil ((double)count / page.getPageSize()));
-		
+		int maxPage = (int)(Math.ceil ((double)count / request.getActualPageSize()));
+
 		return new PaginatedResult<>(
-			new PaginationInfo(page.getPageNumber() + 1, maxPage, page.getPageSize(), count, null, request),
+			new PaginationInfo(request.getActualPage() + 1, maxPage, request.getActualPageSize(), count, null, request),
 			actions
 		);
 	}

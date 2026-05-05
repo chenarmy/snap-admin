@@ -21,26 +21,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AnnotationTypeFilter;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import tech.ailef.snapadmin.external.annotations.Disable;
 import tech.ailef.snapadmin.external.annotations.DisplayFormat;
 import tech.ailef.snapadmin.external.dbmapping.AnnotationUtils;
-import tech.ailef.snapadmin.external.dbmapping.CustomJpaRepository;
 import tech.ailef.snapadmin.external.dbmapping.DbObjectSchema;
+import tech.ailef.snapadmin.external.dbmapping.JdbcSchemaRepository;
 import tech.ailef.snapadmin.external.dbmapping.OrmType;
 import tech.ailef.snapadmin.external.dbmapping.fields.DbField;
 import tech.ailef.snapadmin.external.dbmapping.fields.DbFieldType;
@@ -57,7 +46,7 @@ import tech.ailef.snapadmin.external.misc.Utils;
 public class SnapAdmin {
 	private static final Logger logger = LoggerFactory.getLogger(SnapAdmin.class.getName());
 	
-	private EntityManager entityManager;
+	private JdbcTemplate jdbcTemplate;
 	
 	private List<DbObjectSchema> schemas = new ArrayList<>();
 	
@@ -69,9 +58,9 @@ public class SnapAdmin {
 	
 	private static final String VERSION = "0.2.0";
     
-    public SnapAdmin(@Autowired(required = false) EntityManager entityManager, @Autowired SnapAdminProperties properties) {
+    public SnapAdmin(@Autowired JdbcTemplate jdbcTemplate, @Autowired SnapAdminProperties properties) {
 		this.modelsPackage = Arrays.stream(properties.getModelsPackage().split(",")).map(String::trim).toList();
-		this.entityManager = entityManager;
+		this.jdbcTemplate = jdbcTemplate;
 		this.properties = properties;
 	}
 	
@@ -79,7 +68,7 @@ public class SnapAdmin {
 	private void init() {
 		logger.debug("Initializing SnapAdmin...");
 		
-		OrmType ormType = properties.getOrmType() != null ? properties.getOrmType() : OrmType.JPA;
+		OrmType ormType = properties.getOrmType() != null ? properties.getOrmType() : OrmType.MYBATIS_PLUS;
 		logger.info("Using ORM type: " + ormType);
 		
 		for (String currentPackage : modelsPackage) {
@@ -87,12 +76,7 @@ public class SnapAdmin {
 			
 			List<BeanDefinition> allBeanDefs = new ArrayList<>();
 			
-			if (ormType == OrmType.JPA) {
-				ClassPathScanningCandidateComponentProvider jpaProvider = new ClassPathScanningCandidateComponentProvider(false);
-				jpaProvider.addIncludeFilter(new AnnotationTypeFilter(Entity.class));
-				allBeanDefs.addAll(jpaProvider.findCandidateComponents(currentPackage));
-				logger.debug("Found " + allBeanDefs.size() + " candidate @Entity classes");
-			} else if (ormType == OrmType.MYBATIS_PLUS) {
+			if (ormType == OrmType.MYBATIS_PLUS) {
 				try {
 					Class<?> tableNameClass = Class.forName("com.baomidou.mybatisplus.annotation.TableName");
 					ClassPathScanningCandidateComponentProvider mpProvider = new ClassPathScanningCandidateComponentProvider(false);
@@ -103,6 +87,8 @@ public class SnapAdmin {
 					logger.error("MyBatis-Plus not found on classpath but MYBATIS_PLUS ORM type specified");
 					throw new SnapAdminException("MyBatis-Plus not found on classpath. Please add mybatis-plus dependency.");
 				}
+			} else {
+				throw new SnapAdminException("Only MYBATIS_PLUS ORM type is supported. Please set snapadmin.orm-type=MYBATIS_PLUS");
 			}
 			
 			for (BeanDefinition bd : allBeanDefs) {
@@ -164,16 +150,8 @@ public class SnapAdmin {
 			
 			DbObjectSchema schema = new DbObjectSchema(klass, this);
 			schema.setOrmType(ormType);
-			
-			if (ormType == OrmType.JPA) {
-				if (entityManager == null) {
-					throw new SnapAdminException("EntityManager is null but JPA ORM type is specified");
-				}
-				CustomJpaRepository simpleJpaRepository = new CustomJpaRepository(schema, entityManager);
-				schema.setJpaRepository(simpleJpaRepository);
-			} else if (ormType == OrmType.MYBATIS_PLUS) {
-				logger.debug("MyBatis-Plus entity detected: " + klass.getName());
-			}
+			schema.setRepository(new JdbcSchemaRepository(schema, jdbcTemplate));
+			logger.debug("MyBatis-Plus entity detected: " + klass.getName());
 			
 			logger.debug("Processing class: " + klass + " - Table: " + schema.getTableName());
 			
@@ -206,67 +184,28 @@ public class SnapAdmin {
 	private String determineFieldName(Field f, OrmType ormType) {
 		String fieldName = Utils.camelToSnake(f.getName());
 		
-		if (ormType == OrmType.JPA) {
-			Column[] columnAnnotations = f.getAnnotationsByType(Column.class);
-			if (columnAnnotations.length != 0) {
-				Column col = columnAnnotations[0];
-				if (col.name() != null && !col.name().isBlank())
-					fieldName = col.name();
-			}
-		} else if (ormType == OrmType.MYBATIS_PLUS) {
-			String mpColumnName = AnnotationUtils.getColumnName(f, ormType);
-			if (mpColumnName != null && !mpColumnName.isBlank()) {
-				fieldName = mpColumnName;
-			}
+		String mpColumnName = AnnotationUtils.getColumnName(f, ormType);
+		if (mpColumnName != null && !mpColumnName.isBlank()) {
+			fieldName = mpColumnName;
 		}
 		
 		return fieldName;
 	}
 	
 	private boolean determineNullable(Field f, OrmType ormType) {
-		if (ormType == OrmType.JPA) {
-			Column[] columnAnnotations = f.getAnnotationsByType(Column.class);
-			boolean nullable = true;
-			if (columnAnnotations.length != 0) {
-				Column col = columnAnnotations[0];
-				nullable = col.nullable();
-			}
-			return nullable;
-		} else {
-			return AnnotationUtils.isNullable(f, ormType);
-		}
+		return AnnotationUtils.isNullable(f, ormType);
 	}
 	
 	private DbField mapField(Field f, DbObjectSchema schema, OrmType ormType) {
 		logger.debug("Processing field " + f.getName());
-		
-		OneToMany oneToMany = null;
-		ManyToMany manyToMany = null;
-		ManyToOne manyToOne = null;
-		OneToOne oneToOne = null;
-		Lob lob = null;
-		
-		if (ormType == OrmType.JPA) {
-			oneToMany = f.getAnnotation(OneToMany.class);
-			manyToMany = f.getAnnotation(ManyToMany.class);
-			manyToOne = f.getAnnotation(ManyToOne.class);
-			oneToOne = f.getAnnotation(OneToOne.class);
-			lob = f.getAnnotation(Lob.class);
-		} else {
-			lob = f.getAnnotation(Lob.class);
-		}
-		
+
 		String fieldName = determineFieldName(f, ormType);
-		
+
 		Class<?> connectedType = null;
-		
+
 		DbFieldType fieldType = null;
 		try {
 			Class<? extends DbFieldType> fieldTypeClass = DbFieldType.fromClass(f.getType());
-			
-			if (fieldTypeClass == StringFieldType.class && lob != null) {
-				fieldTypeClass = TextFieldType.class;
-			}
 			
 			if (fieldTypeClass != EnumFieldType.class) {
 				try {
@@ -280,29 +219,6 @@ public class SnapAdmin {
 			// If failure, we try to map a relationship on this field later
 		}
 
-		if (ormType == OrmType.JPA) {
-			if (manyToOne != null || oneToOne != null) {
-				fieldName = mapRelationshipJoinColumn(f, ormType);
-				fieldType = mapForeignKeyType(f.getType());
-				connectedType = f.getType();
-			}
-			
-			if (manyToMany != null || oneToMany != null) {
-				ParameterizedType stringListType = (ParameterizedType) f.getGenericType();
-		        Class<?> targetEntityClass = (Class<?>) stringListType.getActualTypeArguments()[0];
-		        fieldType = mapForeignKeyType(targetEntityClass);
-		        connectedType = targetEntityClass;
-			}
-		}
-		
-		if (fieldType == null && ormType == OrmType.JPA) {
-			Enumerated enumerated = f.getAnnotation(Enumerated.class);
-			if (enumerated != null) {
-				EnumType type = enumerated.value();
-				fieldType = new EnumFieldType(f.getType(), type);
-			}
-		}
-		
 		if (fieldType == null) {
 			throw new UnsupportedFieldTypeException("Unable to determine fieldType for " + f.getType());
 		}
@@ -321,44 +237,6 @@ public class SnapAdmin {
 			field.setNullable(false);
 		
 		return field;
-	}
-	
-	private String mapRelationshipJoinColumn(Field f, OrmType ormType) {
-		String joinColumnName = Utils.camelToSnake(f.getName()) + "_id"; 
-		
-		if (ormType == OrmType.JPA) {
-			JoinColumn[] joinColumn = f.getAnnotationsByType(JoinColumn.class);
-			if (joinColumn.length != 0) {
-				joinColumnName = joinColumn[0].name();
-			}
-		} else {
-			String columnName = AnnotationUtils.getColumnName(f, ormType);
-			if (columnName != null && !columnName.isBlank()) {
-				joinColumnName = columnName;
-			}
-		}
-		return joinColumnName;
-	}
-	
-	private DbFieldType mapForeignKeyType(Class<?> entityClass) {
-		try {
-			Object linkedEntity = entityClass.getConstructor().newInstance();
-			Class<?> linkType = null;
-			
-			for (Field ef : linkedEntity.getClass().getDeclaredFields()) {
-				if (ef.getAnnotationsByType(Id.class).length != 0) {
-					linkType = ef.getType();
-				}
-			}
-			
-			if (linkType == null)
-				throw new SnapAdminException("Unable to find @Id field in Entity class " + entityClass);
-			
-			return DbFieldType.fromClass(linkType).getConstructor().newInstance();
-		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-				| InvocationTargetException | NoSuchMethodException | SecurityException e) {
-			throw new SnapAdminException(e);
-		}
 	}
 
 	public boolean isAuthenticated() {

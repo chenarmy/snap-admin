@@ -57,7 +57,7 @@ import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
 import tech.ailef.snapadmin.external.exceptions.SnapAdminNotFoundException;
 import tech.ailef.snapadmin.external.misc.Utils;
 import tech.ailef.snapadmin.internal.model.ConsoleQuery;
-import tech.ailef.snapadmin.internal.repository.ConsoleQueryRepository;
+import tech.ailef.snapadmin.internal.service.ConsoleQueryService;
 
 @Controller
 @RequestMapping(value = { "/${snapadmin.baseUrl}/", "/${snapadmin.baseUrl}" })
@@ -71,7 +71,7 @@ public class DataExportController {
 	private SnapAdminRepository repository;
 	
 	@Autowired
-	private ConsoleQueryRepository queryRepository;
+	private ConsoleQueryService consoleQueryService;
 	
 	@Autowired
 	private ObjectMapper mapper;
@@ -79,7 +79,8 @@ public class DataExportController {
 	@GetMapping("/console/export/{queryId}")
 	public ResponseEntity<byte[]> export(@PathVariable String queryId, @RequestParam String format, 
 			@RequestParam MultiValueMap<String, String> otherParams) {
-		ConsoleQuery query = queryRepository.findById(queryId).orElseThrow(() -> new SnapAdminNotFoundException("Query not found: " + queryId));
+		ConsoleQuery query = consoleQueryService.findById(queryId)
+			.orElseThrow(() -> new SnapAdminNotFoundException("Query not found: " + queryId));
 		
 		DataExportFormat exportFormat = null;
 		try {
@@ -142,18 +143,18 @@ public class DataExportController {
 		case CSV:
 			return ResponseEntity.ok()
 					.header(HttpHeaders.CONTENT_DISPOSITION,
-							"attachment; filename=\"export_" + schema.getJavaClass().getSimpleName() + ".csv\"")
+							"attachment; filename=\"export_" + schema.getSimpleName() + ".csv\"")
 					.body(toCsv(results, fieldsToInclude, raw).getBytes());
 		case XLSX:
-			String sheetName = schema.getJavaClass().getSimpleName();
+			String sheetName = schema.getSimpleName();
 			return ResponseEntity.ok()
 					.header(HttpHeaders.CONTENT_DISPOSITION,
-					"attachment; filename=\"export_" + schema.getJavaClass().getSimpleName() + ".xlsx\"")
+					"attachment; filename=\"export_" + schema.getSimpleName() + ".xlsx\"")
 					.body(toXlsx(sheetName, results, fieldsToInclude, raw));
 		case JSONL:
 			return ResponseEntity.ok()
 					.header(HttpHeaders.CONTENT_DISPOSITION,
-							"attachment; filename=\"export_" + schema.getJavaClass().getSimpleName() + ".jsonl\"")
+							"attachment; filename=\"export_" + schema.getSimpleName() + ".jsonl\"")
 					.body(toJsonl(results, fieldsToInclude, raw).getBytes());
 		
 		default:

@@ -24,10 +24,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
-import jakarta.persistence.Table;
 import tech.ailef.snapadmin.external.SnapAdmin;
 import tech.ailef.snapadmin.external.annotations.ComputedColumn;
 import tech.ailef.snapadmin.external.annotations.DisableCreate;
@@ -43,39 +39,39 @@ import tech.ailef.snapadmin.external.exceptions.SnapAdminNotFoundException;
 import tech.ailef.snapadmin.external.misc.Utils;
 
 /**
- * A class that represents a table/`@Entity` as reconstructed from the
- * JPA annotations found on its fields.
+ * A class that represents a table as reconstructed from the
+ * MyBatis-Plus annotations found on its fields.
  *
  */
 public class DbObjectSchema {
 	/**
 	 * All the fields in this table. The fields include all the
-	 * columns present in the table plus relationship fields.
+	 * columns present in the table.
 	 */
 	@JsonIgnore
 	private List<DbField> fields = new ArrayList<>();
 	
 	/**
-	 * The methods designated as computed columns in the `@Entity` class.
+	 * The methods designated as computed columns in the entity class.
 	 */
 	@JsonIgnore
 	private Map<String, Method> computedColumns = new HashMap<>();
 	
 	/**
-	 * A JPA repository to operate on the database
+	 * Schema-level repository used to operate on the database.
 	 */
-	private CustomJpaRepository jpaRepository;
+	private SchemaRepository repository;
 	
 	/**
-	 * The ORM type used by this schema (JPA or MYBATIS_PLUS)
+	 * The ORM type used by this schema (always MYBATIS_PLUS)
 	 */
 	@JsonIgnore
-	private OrmType ormType = OrmType.JPA;
+	private OrmType ormType = OrmType.MYBATIS_PLUS;
 	
 	private SnapAdmin snapAdmin;
 	
 	/**
-	 * The corresponding `@Entity` class that this schema describes
+	 * The corresponding entity class that this schema describes
 	 */
 	@JsonIgnore
 	private Class<?> entityClass;
@@ -89,7 +85,7 @@ public class DbObjectSchema {
 	
 	/**
 	 * Initializes this schema for the specific entity class. 
-	 * Determines the table name from the `@Table` (JPA) or `@TableName` (MyBatis-Plus) annotation 
+	 * Determines the table name from the `@TableName` (MyBatis-Plus) annotation 
 	 * and also which methods are `@ComputedColumn`s
 	 * @param klass the entity class
 	 * @param snapAdmin the SnapAdmin instance
@@ -99,30 +95,23 @@ public class DbObjectSchema {
 		this.entityClass = klass;
 		
 		// Determine table name based on ORM type
-		String tableName = Utils.camelToSnake(getJavaClass().getSimpleName());
+		String tableName = Utils.camelToSnake(getSimpleName());
 		
-		// Try JPA @Table annotation first
-		Table tableAnnotation = klass.getAnnotation(Table.class);
-		if (tableAnnotation != null && tableAnnotation.name() != null
-			&& !tableAnnotation.name().isBlank()) { 
-			tableName = tableAnnotation.name();
-		} else {
-			// Try MyBatis-Plus @TableName annotation
-			try {
-				Class<?> tableNameClass = Class.forName("com.baomidou.mybatisplus.annotation.TableName");
-				Object tableNameAnnotation = klass.getAnnotation((Class<java.lang.annotation.Annotation>) tableNameClass);
-				if (tableNameAnnotation != null) {
-					java.lang.reflect.Method valueMethod = tableNameClass.getMethod("value");
-					String mpTableName = (String) valueMethod.invoke(tableNameAnnotation);
-					if (mpTableName != null && !mpTableName.isBlank()) {
-						tableName = mpTableName;
-					}
+		// Try MyBatis-Plus @TableName annotation
+		try {
+			Class<?> tableNameClass = Class.forName("com.baomidou.mybatisplus.annotation.TableName");
+			Object tableNameAnnotation = klass.getAnnotation((Class<java.lang.annotation.Annotation>) tableNameClass);
+			if (tableNameAnnotation != null) {
+				java.lang.reflect.Method valueMethod = tableNameClass.getMethod("value");
+				String mpTableName = (String) valueMethod.invoke(tableNameAnnotation);
+				if (mpTableName != null && !mpTableName.isBlank()) {
+					tableName = mpTableName;
 				}
-			} catch (Exception e) {
-				// MyBatis-Plus not on classpath or other error, ignore
 			}
+		} catch (Exception e) {
+			// MyBatis-Plus not on classpath or other error, ignore
 		}
-
+		
 		this.tableName = tableName;
 		
 		List<Method> methods = Arrays.stream(entityClass.getMethods())
@@ -153,19 +142,29 @@ public class DbObjectSchema {
 	}
 	
 	/**
-	 * Returns the Java class for the underlying `@Entity` this schema
+	 * Returns the Java class for the underlying entity this schema
 	 * corresponds to
-	 * @return  the Java class for the `@Entity` this schema corresponds to
+	 * @return  the Java class for the entity this schema corresponds to
 	 */
 	@JsonIgnore
 	public Class<?> getJavaClass() {
 		return entityClass;
 	}
+
+	/**
+	 * Returns the simple name of the Java class.
+	 * This method is provided to avoid SpEL restrictions on calling getSimpleName() on Class objects.
+	 * @return the simple name of the entity class
+	 */
+	@JsonIgnore
+	public String getSimpleName() {
+		return entityClass.getSimpleName();
+	}
 	
 	/**
-	 * Returns the name of the Java class for the underlying `@Entity` this schema
+	 * Returns the name of the Java class for the underlying entity this schema
 	 * corresponds to
-	 * @return  the name of the Java class for the `@Entity` this schema corresponds to
+	 * @return  the name of the Java class for the entity this schema corresponds to
 	 */
 	@JsonIgnore
 	public String getClassName() {
@@ -186,7 +185,7 @@ public class DbObjectSchema {
 	
 	/**
 	 * Get a field by its Java name, i.e. the name of the instance variable
-	 * in the `@Entity` class
+	 * in the entity class
 	 * @param name	name of the instance variable
 	 * @return	the DbField if found, null otherwise
 	 */
@@ -196,7 +195,7 @@ public class DbObjectSchema {
 	
 	/**
 	 * Get a field by its database name, i.e. the name of the column corresponding
-	 * to the field
+	 * to the field in the entity class
 	 * @param name	name of the column
 	 * @return	the DbField if found, null otherwise
 	 */
@@ -219,7 +218,7 @@ public class DbObjectSchema {
 	
 	/**
 	 * Returns the ORM type used by this schema
-	 * @return the ORM type (JPA or MYBATIS_PLUS)
+	 * @return the ORM type (only MYBATIS_PLUS)
 	 */
 	public OrmType getOrmType() {
 		return ormType;
@@ -227,26 +226,26 @@ public class DbObjectSchema {
 	
 	/**
 	 * Sets the ORM type used by this schema
-	 * @param ormType the ORM type (JPA or MYBATIS_PLUS)
+	 * @param ormType the ORM type (only MYBATIS_PLUS)
 	 */
 	public void setOrmType(OrmType ormType) {
 		this.ormType = ormType;
 	}
 	
 	/**
-	 * Returns the underlying CustomJpaRepository (for JPA ORM type)
-	 * @return the CustomJpaRepository
+	 * Returns the underlying schema repository.
+	 * @return the schema repository
 	 */
-	public CustomJpaRepository getJpaRepository() {
-		return jpaRepository;
+	public SchemaRepository getRepository() {
+		return repository;
 	}
 
 	/**
-	 * Sets the underlying CustomJpaRepository
-	 * @param jpaRepository
+	 * Sets the underlying schema repository
+	 * @param repository
 	 */
-	public void setJpaRepository(CustomJpaRepository jpaRepository) {
-		this.jpaRepository = jpaRepository;
+	public void setRepository(SchemaRepository repository) {
+		this.repository = repository;
 	}
 	
 	/**
@@ -282,16 +281,10 @@ public class DbObjectSchema {
 	public List<DbField> getSortedFields(boolean readOnly) {
 		return getFields().stream()
 			.filter(f -> {
-				boolean toMany = f.getPrimitiveField().getAnnotation(OneToMany.class) == null
-					&& f.getPrimitiveField().getAnnotation(ManyToMany.class) == null;
-				
-				OneToOne oneToOne = f.getPrimitiveField().getAnnotation(OneToOne.class);
-				boolean mappedBy = oneToOne != null && !oneToOne.mappedBy().isBlank();
-				
+				// MyBatis-Plus mode: no relationship annotations, all fields are considered "toMany" = false
+				// Only filter out hidden columns based on readOnly flag
 				boolean hidden = f.getPrimitiveField().getAnnotation(HiddenColumn.class) != null;
-				
-				
-				return toMany && !mappedBy && (!hidden || !readOnly);
+				return !hidden || !readOnly;
 			})
 			.sorted((a, b) -> {
 				if (a.isPrimaryKey() && !b.isPrimaryKey())
@@ -310,29 +303,23 @@ public class DbObjectSchema {
 	
 	/**
 	 * Returns the list of relationship fields
+	 * MyBatis-Plus mode: no relationship annotations, so this always returns empty list.
 	 * @return
 	 */
 	public List<DbField> getRelationshipFields() {
-		List<DbField> res = getFields().stream().filter(f -> {
-			return f.getPrimitiveField().getAnnotation(OneToMany.class) != null
-				|| f.getPrimitiveField().getAnnotation(ManyToMany.class) != null;
-		})
-		.filter(f -> snapAdmin.isManagedClass(f.getConnectedType()))
-		.collect(Collectors.toList());
-		return res;
+		// MyBatis-Plus does not have relationship annotations
+		return new ArrayList<>();
 	}
 	
 	/**
 	 * Returns the list of ManyToMany fields owned by this class (i.e. they
 	 * do not have "mappedBy")
+	 * MyBatis-Plus mode: no relationship annotations, so this always returns empty list.
 	 * @return
 	 */
 	public List<DbField> getManyToManyOwnedFields() {
-		List<DbField> res = getFields().stream().filter(f -> {
-			ManyToMany anno = f.getPrimitiveField().getAnnotation(ManyToMany.class);
-			return anno != null && anno.mappedBy().isBlank();
-		}).collect(Collectors.toList());
-		return res;
+		// MyBatis-Plus does not have relationship annotations
+		return new ArrayList<>();
 	}
 	
 	/**
@@ -396,7 +383,7 @@ public class DbObjectSchema {
 	 * @return
 	 */
 	public List<DbObject> findAll() {
-		List<?> r = jpaRepository.findAll();
+		List<?> r = repository.findAllList(this);
 		return r.stream().map(o -> new DbObject(o, this)).toList();
 	}
 

@@ -8,8 +8,6 @@
 
 package tech.ailef.snapadmin.external.dto;
 
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -173,22 +171,27 @@ public class LogsSearchRequest implements FilterRequest {
 	}
 	
 	/**
-	 * Build a Spring PageRequest object from the parameters in this request
-	 * @return a Spring PageRequest object
+	 * Get the actual page number (0-indexed)
+	 * @return the 0-indexed page number
 	 */
-	public PageRequest toPageRequest() {
-		int actualPage = page - 1 < 0 ? 0 : page - 1;
-		int actualPageSize = pageSize <= 0 ? 50 : pageSize;
-		if (sortKey == null)
-			return PageRequest.of(actualPage, actualPageSize);
+	public int getActualPage() {
+		return page - 1 < 0 ? 0 : page - 1;
+	}
 
-		if (sortOrder == null) sortOrder = "ASC";
-		
-		if (sortOrder.equals("DESC")) {
-			return PageRequest.of(actualPage, actualPageSize, Sort.by(sortKey).descending());
-		} else {
-			return PageRequest.of(actualPage, actualPageSize, Sort.by(sortKey).ascending());
-		}
+	/**
+	 * Get the actual page size with default value
+	 * @return the page size
+	 */
+	public int getActualPageSize() {
+		return pageSize <= 0 ? 50 : pageSize;
+	}
+
+	/**
+	 * Get the sort order, defaults to ASC if not specified
+	 * @return the sort order
+	 */
+	public String getActualSortOrder() {
+		return sortOrder == null ? "ASC" : sortOrder;
 	}
 
 	@Override

@@ -16,7 +16,7 @@ Yes/No/Not applicable
 **Stacktrace**
 If available, provide the full stack trace for the error.
 
-**@Entity code**
+**@TableName code**
 If relevant, provide the code or part of it for the class(es) involved in the error.
 
 **application.properties**

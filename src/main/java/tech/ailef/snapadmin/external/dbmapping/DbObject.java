@@ -19,10 +19,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import tech.ailef.snapadmin.external.annotations.DisplayName;
 import tech.ailef.snapadmin.external.dbmapping.fields.BooleanFieldType;
 import tech.ailef.snapadmin.external.dbmapping.fields.DbField;
@@ -34,7 +30,7 @@ import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
  */
 public class DbObject {
 	/**
-	 * The instance of the object, i.e. an instance of the `@Entity` class
+	 * The instance of the object, i.e. an instance of the entity class
 	 */
 	private Object instance;
 	
@@ -76,12 +72,12 @@ public class DbObject {
 	}
 	
 	public DbObject traverse(DbField field) {
-		ManyToOne manyToOne = field.getPrimitiveField().getAnnotation(ManyToOne.class);
-		OneToOne oneToOne = field.getPrimitiveField().getAnnotation(OneToOne.class);
-		if (oneToOne != null || manyToOne != null) {
+		// MyBatis-Plus mode: no relationship annotations
+		// Check if the field is a to-one relationship based on field type
+		if (field.isToOne()) {
 			Object linkedObject = get(field.getJavaName()).getValue();
 			if (linkedObject == null) return null;
-			
+
 			DbObject linkedDbObject = new DbObject(linkedObject, field.getConnectedSchema());
 			return linkedDbObject;
 		} else {
@@ -96,12 +92,12 @@ public class DbObject {
 	
 	@SuppressWarnings("unchecked")
 	public List<DbObject> traverseMany(DbField field) {
-		ManyToMany manyToMany = field.getPrimitiveField().getAnnotation(ManyToMany.class);
-		OneToMany oneToMany = field.getPrimitiveField().getAnnotation(OneToMany.class);
-		if (manyToMany != null || oneToMany != null) {
+		// MyBatis-Plus mode: no relationship annotations
+		// Check if the field is a to-many relationship based on field type
+		if (field.isToMany()) {
 			Collection<Object> linkedObjects = (Collection<Object>)get(field.getJavaName()).getValue();
 			return linkedObjects.stream().map(o -> new DbObject(o, field.getConnectedSchema()))
-				.collect(Collectors.toList());
+					.collect(Collectors.toList());
 		} else {
 			throw new SnapAdminException("Cannot traverse field " + field.getName() + " in class " + schema.getClassName());
 		}
@@ -185,7 +181,7 @@ public class DbObject {
 	public void setRelationship(String fieldName, Object primaryKeyValue) {
 		DbField field = schema.getFieldByName(fieldName);
 		DbObjectSchema linkedSchema = field.getConnectedSchema();
-		Optional<?> obj = linkedSchema.getJpaRepository().findById(primaryKeyValue);
+		Optional<?> obj = linkedSchema.getRepository().findRawById(linkedSchema, primaryKeyValue);
 		
 		if (!obj.isPresent()) {
 			throw new SnapAdminException("Invalid value " + primaryKeyValue + " for " + fieldName

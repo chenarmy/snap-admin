@@ -12,6 +12,7 @@ package tech.ailef.snapadmin.external.dbmapping.query;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
 
@@ -39,6 +40,10 @@ public class DbQueryResultRow {
 				return f1.getName().compareTo(f2.getName());
 			}
 		}).toList();
+	}
+
+	public Set<DbQueryOutputField> keySet() {
+		return values.keySet();
 	}
 	
 	public String getQuery() {

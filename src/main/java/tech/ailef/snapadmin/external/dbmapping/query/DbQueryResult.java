@@ -17,10 +17,19 @@ import java.util.List;
  * the SQL console.
  */
 public class DbQueryResult {
+	private long totalCount;
 	private List<DbQueryResultRow> rows;
+	private List<DbQueryOutputField> fields;
 
 	public DbQueryResult(List<DbQueryResultRow> rows) {
 		this.rows = rows;
+		this.totalCount = rows.size();
+	}
+
+	public DbQueryResult(long totalCount, List<DbQueryResultRow> rows, List<DbQueryOutputField> fields) {
+		this.totalCount = totalCount;
+		this.rows = rows;
+		this.fields = fields;
 	}
 	
 	public List<DbQueryResultRow> getRows() {
@@ -41,6 +50,10 @@ public class DbQueryResult {
 	
 	public int size() {
 		return rows.size();
+	}
+
+	public List<DbQueryOutputField> getFields() {
+		return fields != null ? fields : new ArrayList<>();
 	}
 	
 	public void crop(int startOffset, int endOffset) {

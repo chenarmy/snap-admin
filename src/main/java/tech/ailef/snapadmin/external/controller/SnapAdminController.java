@@ -21,7 +21,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.hibernate.id.IdentifierGenerationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -203,7 +202,7 @@ public class SnapAdminController {
 				result = repository.findAll(schema, page, pageSize, sortKey, sortOrder);
 			}
 				
-			model.addAttribute("title", "Entities | " + schema.getJavaClass().getSimpleName() + " | Index");
+			model.addAttribute("title", "Entities | " + schema.getSimpleName() + " | Index");
 			model.addAttribute("page", result);
 			model.addAttribute("schema", schema);
 			model.addAttribute("activePage", "entities");
@@ -259,11 +258,11 @@ public class SnapAdminController {
 		
 		DbObject object = repository.findById(schema, pkValue).orElseThrow(() -> {
 			return new SnapAdminNotFoundException(
-				schema.getJavaClass().getSimpleName() + " with ID " + id + " not found."
+				schema.getSimpleName() + " with ID " + id + " not found."
 			);
 		});
 		
-		model.addAttribute("title", "Entities | " + schema.getJavaClass().getSimpleName() + " | " + object.getDisplayName());
+		model.addAttribute("title", "Entities | " + schema.getSimpleName() + " | " + object.getDisplayName());
 		model.addAttribute("object", object);
 		model.addAttribute("activePage", "entities");
 		model.addAttribute("schema", schema);
@@ -278,13 +277,13 @@ public class SnapAdminController {
 		
 		if (!schema.isCreateEnabled()) {
 			attr.addFlashAttribute("errorTitle", "Unauthorized");
-			attr.addFlashAttribute("error", "CREATE operations have been disabled on this type (" + schema.getJavaClass().getSimpleName() + ").");
+			attr.addFlashAttribute("error", "CREATE operations have been disabled on this type (" + schema.getSimpleName() + ").");
 			return "redirect:/" + properties.getBaseUrl() + "/model/" + className;
 		}
 		
 		model.addAttribute("className", className);
 		model.addAttribute("schema", schema);
-		model.addAttribute("title", "Entities | " + schema.getJavaClass().getSimpleName() + " | Create");
+		model.addAttribute("title", "Entities | " + schema.getSimpleName() + " | Create");
 		model.addAttribute("activePage", "entities");
 		model.addAttribute("create", true);
 		
@@ -299,7 +298,7 @@ public class SnapAdminController {
 		
 		if (!schema.isEditEnabled()) {
 			attr.addFlashAttribute("errorTitle", "Unauthorized");
-			attr.addFlashAttribute("error", "EDIT operations have been disabled on this type (" + schema.getJavaClass().getSimpleName() + ").");
+			attr.addFlashAttribute("error", "EDIT operations have been disabled on this type (" + schema.getSimpleName() + ").");
 			return "redirect:/" + properties.getBaseUrl() + "/model/" + className;
 		}
 		
@@ -309,7 +308,7 @@ public class SnapAdminController {
 			);
 		});
 		
-		model.addAttribute("title", "Entities | " + schema.getJavaClass().getSimpleName() + " | Edit | " + object.getDisplayName());
+		model.addAttribute("title", "Entities | " + schema.getSimpleName() + " | Edit | " + object.getDisplayName());
 		model.addAttribute("className", className);
 		model.addAttribute("object", object);
 		model.addAttribute("schema", schema);
@@ -339,7 +338,8 @@ public class SnapAdminController {
 		}
 		
 		try {
-			repository.delete(schema, id);
+			Object pkValue = schema.getPrimaryKey().getType().parseValue(id);
+			repository.deleteById(schema, pkValue);
 		} catch (DataIntegrityViolationException e) {
 			attr.addFlashAttribute("errorTitle", "Unable to DELETE row");
 			attr.addFlashAttribute("error", e.getMessage());
@@ -347,7 +347,7 @@ public class SnapAdminController {
 		}
 		
 		saveAction(new UserAction(schema.getTableName(), id, "DELETE", schema.getClassName(), authUser));
-		attr.addFlashAttribute("message", "Deleted " + schema.getJavaClass().getSimpleName() + " with " 
+		attr.addFlashAttribute("message", "Deleted " + schema.getSimpleName() + " with " 
 				+ schema.getPrimaryKey().getName() + "=" + id);
 
 		return "redirect:/" + properties.getBaseUrl() + "/model/" + className;
@@ -375,7 +375,8 @@ public class SnapAdminController {
 		int countDeleted = 0;
 		for (String id : ids) {
 			try {
-				repository.delete(schema, id);
+				Object pkValue = schema.getPrimaryKey().getType().parseValue(id);
+				repository.deleteById(schema, pkValue);
 				countDeleted += 1;
 			} catch (DataIntegrityViolationException e) {
 				attr.addFlashAttribute("error", e.getMessage());
@@ -445,7 +446,7 @@ public class SnapAdminController {
 		
 		if (!schema.isCreateEnabled() && create) {
 			attr.addFlashAttribute("errorTitle", "Unauthorized");
-			attr.addFlashAttribute("error", "CREATE operations have been disabled on this type (" + schema.getJavaClass().getSimpleName() + ").");
+			attr.addFlashAttribute("error", "CREATE operations have been disabled on this type (" + schema.getSimpleName() + ").");
 			return "redirect:/" + properties.getBaseUrl() + "/model/" + className;
 		}
 
@@ -457,7 +458,6 @@ public class SnapAdminController {
 		try {
 			if (pkValue == null) {
 				Object newPrimaryKey = repository.create(schema, params, files, pkValue);
-				repository.attachManyToMany(schema, newPrimaryKey, multiValuedParams);				
 				pkValue = newPrimaryKey.toString();
 				attr.addFlashAttribute("message", "Item created successfully.");
 				saveAction(new UserAction(schema.getTableName(), pkValue, "CREATE", schema.getClassName(), authUser));
@@ -473,18 +473,16 @@ public class SnapAdminController {
 						attr.addFlashAttribute("params", params);
 					} else {
 						repository.update(schema, params, files);
-						repository.attachManyToMany(schema, parsedPkValue, multiValuedParams);
 						attr.addFlashAttribute("message", "Item saved successfully.");
 						saveAction(new UserAction(schema.getTableName(), parsedPkValue.toString(), "EDIT", schema.getClassName(), authUser));
 					}
 				} else {
 					Object newPrimaryKey = repository.create(schema, params, files, pkValue);
-					repository.attachManyToMany(schema, newPrimaryKey, multiValuedParams);
 					attr.addFlashAttribute("message", "Item created successfully");
 					saveAction(new UserAction(schema.getTableName(), pkValue, "CREATE", schema.getClassName(), authUser));
 				}
 			}
-		} catch (DataIntegrityViolationException | UncategorizedSQLException | IdentifierGenerationException e) {
+		} catch (DataIntegrityViolationException | UncategorizedSQLException e) {
 			attr.addFlashAttribute("errorTitle", "Error");
 			attr.addFlashAttribute("error", e.getMessage());
 			attr.addFlashAttribute("params", params);
@@ -571,15 +569,7 @@ public class SnapAdminController {
 		
 		if (tabs.isEmpty()) {
 			ConsoleQuery q = new ConsoleQuery();
-			
-			int randomIndex = new Random().nextInt(0, snapAdmin.getSchemas().size());
-			String randomTable = snapAdmin.getSchemas().get(randomIndex).getTableName();
-			
-			q.setSql(
-				"-- It's recommended to always include a LIMIT clause in your query\n"
-				+ "-- Although the SQL Console supports pagination, it retrieves the entire ResultSet\n\n"
-				+ "-- SELECT * FROM " + randomTable + " LIMIT 1000;\n"
-			);
+			q.setSql(buildDefaultConsoleSql());
 			
 			consoleService.save(q);
 			return "redirect:/" + properties.getBaseUrl() + "/console/run/" + q.getId();
@@ -616,9 +606,11 @@ public class SnapAdminController {
 			return new SnapAdminNotFoundException("Query with ID " + queryId + " not found.");
 		});
 		
-		if (query != null && !query.isBlank()) {
-			activeQuery.setSql(query);
+		String nextQuery = query != null ? query : activeQuery.getSql();
+		if (!containsExecutableSql(nextQuery)) {
+			nextQuery = buildDefaultConsoleSql();
 		}
+		activeQuery.setSql(nextQuery);
 		if (queryTitle != null && !queryTitle.isBlank()) {
 			activeQuery.setTitle(queryTitle);
 		}
@@ -654,6 +646,24 @@ public class SnapAdminController {
 		double elapsedTime = (System.currentTimeMillis() - startTime) / 1000.0;
 		model.addAttribute("elapsedTime", new DecimalFormat("0.0#").format(elapsedTime));
 		return "snapadmin/console";
+	}
+
+	private String buildDefaultConsoleSql() {
+		int randomIndex = new Random().nextInt(0, snapAdmin.getSchemas().size());
+		String randomTable = snapAdmin.getSchemas().get(randomIndex).getTableName();
+		return "-- It's recommended to always include a LIMIT clause in your query\n"
+			+ "-- Although the SQL Console supports pagination, it retrieves the entire ResultSet\n\n"
+			+ "SELECT * FROM " + randomTable + " LIMIT 1000;\n";
+	}
+
+	private boolean containsExecutableSql(String sql) {
+		if (sql == null) {
+			return false;
+		}
+
+		return sql.lines()
+			.map(String::trim)
+			.anyMatch(line -> !line.isBlank() && !line.startsWith("--"));
 	}
 
 	

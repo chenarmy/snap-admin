@@ -1,31 +1,20 @@
 /* 
  * SnapAdmin - An automatically generated CRUD admin UI for Spring Boot apps
-
  * Copyright (C) 2023 Ailef (http://ailef.tech)
- * 
-
  */
-
 
 package tech.ailef.snapadmin.external.dbmapping;
 
-import java.sql.ResultSetMetaData;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.TransientDataAccessResourceException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,15 +26,11 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import tech.ailef.snapadmin.external.SnapAdmin;
 import tech.ailef.snapadmin.external.annotations.ReadOnly;
-import tech.ailef.snapadmin.external.dbmapping.fields.DbField;
 import tech.ailef.snapadmin.external.dbmapping.query.DbQueryOutputField;
 import tech.ailef.snapadmin.external.dbmapping.query.DbQueryResult;
 import tech.ailef.snapadmin.external.dbmapping.query.DbQueryResultRow;
-import tech.ailef.snapadmin.external.dto.FacetedSearchRequest;
 import tech.ailef.snapadmin.external.dto.PaginatedResult;
-import tech.ailef.snapadmin.external.dto.PaginationInfo;
 import tech.ailef.snapadmin.external.dto.QueryFilter;
-import tech.ailef.snapadmin.external.exceptions.InvalidPageException;
 import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
 
 /**
@@ -61,6 +46,10 @@ public class SnapAdminRepository {
 	
 	public SnapAdminRepository() {
 	}
+	
+	private SchemaRepository repository(DbObjectSchema schema) {
+		return schema.getRepository();
+	}
 
 	/**
 	 * Find an object by ID
@@ -70,19 +59,11 @@ public class SnapAdminRepository {
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public Optional<DbObject> findById(DbObjectSchema schema, Object id) {
-		SimpleJpaRepository repository = schema.getJpaRepository();
-		
-		Optional optional = repository.findById(id);
-		if (optional.isEmpty())
-			return Optional.empty();
-		else {
-			DbObject obj = new DbObject(optional.get(), schema);
-			return Optional.of(obj);
-		}
+		return repository(schema).findById(schema, id);
 	}
 
 	public long count(DbObjectSchema schema) {
-		return schema.getJpaRepository().count();
+		return repository(schema).count(schema);
 	}
 	
 	/**
@@ -92,17 +73,12 @@ public class SnapAdminRepository {
 	 * @return
 	 */
 	public long count(DbObjectSchema schema, String query, Set<QueryFilter> queryFilters) {
-		return schema.getJpaRepository().count(query, queryFilters);
+		return repository(schema).count(schema, query, queryFilters);
 	}
 
 	public List<DbObject> search(DbObjectSchema schema, String query, Set<QueryFilter> queryFilters) {
-		CustomJpaRepository jpaRepository = schema.getJpaRepository();
-        
-		return jpaRepository.search(query, queryFilters).stream()
-			.map(o  -> new DbObject(o, schema))
-			.toList();
+		return repository(schema).search(schema, query, queryFilters);
 	}
-	
 	
 	/**
 	 * Find all the objects in the schema. Only returns a single page of
@@ -114,60 +90,20 @@ public class SnapAdminRepository {
 	 * @param sortOrder
 	 * @return
 	 */
-	@SuppressWarnings("rawtypes")
 	public PaginatedResult<DbObject> findAll(DbObjectSchema schema, int page, int pageSize, String sortKey, String sortOrder) {
-		SimpleJpaRepository repository = schema.getJpaRepository();
-		
-		long maxElement = count(schema);
-		int maxPage = (int)(Math.ceil ((double)maxElement / pageSize));
-		
-		if (page <= 0) page = 1;
-		if (page > maxPage && maxPage != 0) {
-			throw new InvalidPageException();
-		}
-		
-		Sort sort = null;
-		if (sortKey != null) {
-			sort = Sort.by(sortKey);
-		}
-		if (Objects.equals(sortOrder, "ASC")) {
-			sort = sort.ascending();
-		} else if (Objects.equals(sortOrder, "DESC")) {
-			sort = sort.descending();
-		}
-		PageRequest pageRequestion = null;
-		
-		if (sort != null) {
-			pageRequestion = PageRequest.of(page - 1, pageSize, sort);
-		} else {
-			pageRequestion = PageRequest.of(page - 1, pageSize);
-		}
-		
-		
-		Page findAll = repository.findAll(pageRequestion);
-		List<DbObject> results = new ArrayList<>();
-		for (Object o : findAll) {
-			results.add(new DbObject(o, schema));
-		}
-		
-		
-		return new PaginatedResult<DbObject>(
-			new PaginationInfo(page, maxPage, pageSize, maxElement, null, null),
-			results
-		);
+		return repository(schema).findAll(schema, page, pageSize, sortKey, sortOrder);
 	}
 	
 	/**
-	 * Update an existing object with new values. We don't use the "standard"
-	 * JPA repository save method in this case (like we do on create) because
-	 * we need to handle several edge cases in terms of how missing values
+	 * Update an existing object with new values.
+	 * We need to handle several edge cases in terms of how missing values
 	 * are handled and also {@linkplain ReadOnly} fields. For this reason, we
 	 * also need to call the validation manually.
 	 * @param schema the schema where we need to update an item
 	 * @param params the String-valued params coming from the HTML form
 	 * @param files the file params coming from the HTML form
 	 */
-	@Transactional("transactionManager")
+	@Transactional("internalTransactionManager")
 	public void update(DbObjectSchema schema, Map<String, String> params, Map<String, MultipartFile> files) {
 		DbObject obj = schema.buildObject(params, files);
 		Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
@@ -177,54 +113,22 @@ public class SnapAdminRepository {
 			throw new ConstraintViolationException(violations);
 		}
 		
-		schema.getJpaRepository().update(schema, params, files);
-	}
-	
-	@SuppressWarnings("unchecked")
-	@Transactional("transactionManager")
-	private Object save(DbObjectSchema schema, DbObject o) {
-		return schema.getJpaRepository().save(o.getUnderlyingInstance());
+		repository(schema).update(schema, params, files);
 	}
 	
 	/**
-	 * Attaches multiple many to many relationships to an object, parsed from a multi -valued map.
+	 * Attaches multiple many to many relationships to an object, parsed from a multi-valued map.
+	 * Note: MyBatis-Plus mode currently does not support auto-maintenance of join tables.
 	 * @param schema	the entity class that owns this relationship
 	 * @param id	the primary key of the entity where these relationships have to be attached to
 	 * @param params	the multi-valued map containing the many-to-many relationships
 	 */
-	@Transactional("transactionManager")
+	@Transactional("internalTransactionManager")
 	public void attachManyToMany(DbObjectSchema schema, Object id, Map<String, List<String>> params) {
-		Optional<DbObject> optional = findById(schema, id);
-
-		DbObject dbObject = optional.orElseThrow(() -> {
-			return new SnapAdminException("Unable to retrieve newly inserted item");
-		});
-		
-		for (String mParam : params.keySet()) {
-			String fieldName = mParam.replace("[]", "");
-			
-			List<String> idValues = params.get(mParam);
-			DbField field = schema.getFieldByName(fieldName);
-			
-			DbObjectSchema linkedSchema = field.getConnectedSchema();
-			
-			List<DbObject> traverseMany =  new ArrayList<>();
-			for (String oId : idValues) {
-				Optional<DbObject> findById = findById(linkedSchema, oId);
-				if (findById.isPresent()) {
-					traverseMany.add(findById.get());
-				}
-			}
-			
-			dbObject.set(
-				field.getJavaName(), 
-				traverseMany.stream().map(o -> o.getUnderlyingInstance()).collect(Collectors.toList())
-			);
-		}
-		
-		save(schema, dbObject);
+		// MyBatis-Plus mode currently does not support auto-maintenance of join tables.
+		return;
 	}
-	
+
 	/**
 	 * Create a new object with the specific primary key and values,
 	 * returns the primary key of the created object
@@ -232,11 +136,9 @@ public class SnapAdminRepository {
 	 * @param values
 	 * @param primaryKey
 	 */
-	@Transactional("transactionManager")
+	@Transactional("internalTransactionManager")
 	public Object create(DbObjectSchema schema, Map<String, String> values, Map<String, MultipartFile> files, String primaryKey) {
-		DbObject obj = schema.buildObject(values, files);
-		Object save = save(schema, obj);
-		return new DbObject(save, schema).getPrimaryKeyValue();
+		return repository(schema).create(schema, values, files, primaryKey);
 	}
 	
 	/**
@@ -247,84 +149,313 @@ public class SnapAdminRepository {
 	 */
 	public PaginatedResult<DbObject> search(DbObjectSchema schema, String query, int page, int pageSize, String sortKey, 
 			String sortOrder, Set<QueryFilter> queryFilters) {
-		CustomJpaRepository jpaRepository = schema.getJpaRepository();
-        
-		long maxElement = count(schema, query, queryFilters);
-		int maxPage = (int)(Math.ceil ((double)maxElement / pageSize));
-		
-		if (page <= 0) page = 1;
-		if (page > maxPage && maxPage != 0) {
-			throw new InvalidPageException();
-		}
-		
-		return new PaginatedResult<DbObject>(
-			new PaginationInfo(page, maxPage, pageSize, maxElement, query, new FacetedSearchRequest(queryFilters)), 
-			jpaRepository.search(query, page, pageSize, sortKey, sortOrder, queryFilters).stream()
-				.map(o  -> new DbObject(o, schema))
-				.toList()
-		);
+		return repository(schema).search(schema, query, page, pageSize, sortKey, sortOrder, queryFilters);
 	}
 	
 	/**
-	 * Fuzzy search on primary key value and display name
+	 * Delete an object by primary key.
+	 * @param schema
+	 * @param id
+	 */
+	@Transactional("internalTransactionManager")
+	public void deleteById(DbObjectSchema schema, Object id) {
+		repository(schema).deleteById(schema, id.toString());
+	}
+	
+	/**
+	 * Runs a custom user query.
+	 * @param schema
+	 * @param query
+	 * @param page
+	 * @param pageSize
+	 * @return
+	 */
+	public DbQueryResult runQuery(DbObjectSchema schema, String query, int page, int pageSize) {
+		long count = repository(schema).countQueryResults(query);
+		List<DbQueryResultRow> results = repository(schema).runQuery(schema, query, page, pageSize);
+
+		List<DbQueryOutputField> fields = new ArrayList<>();
+		if (results.size() > 0) {
+			DbQueryResultRow firstRow = results.get(0);
+			for (DbQueryOutputField key : firstRow.keySet()) {
+				fields.add(key);
+			}
+		}
+
+		return new DbQueryResult(count, results, fields);
+	}
+	
+	/**
+	 * Counts the results of a query.
 	 * @param schema
 	 * @param query
 	 * @return
 	 */
-	public List<DbObject> search(DbObjectSchema schema, String query) {
-		CustomJpaRepository jpaRepository = schema.getJpaRepository();
-		
-		return jpaRepository.search(query, 1, 50, null, null, null).stream()
-					.map(o  -> new DbObject(o, schema))
-					.toList();
+	public long countQueryResults(DbObjectSchema schema, String query) {
+		return repository(schema).countQueryResults(query);
 	}
 	
 	/**
-	 * Execute custom SQL query using jdbcTemplate
+	 * Create a new object with the specific primary key and values, returns the raw result.
+	 * Used internally to create objects programmatically.
+	 * @param schema
+	 * @param values
+	 * @param primaryKey
+	 * @return
 	 */
-	public DbQueryResult executeQuery(String sql) {
-		List<DbQueryResultRow> results = new ArrayList<>();
-		if (sql != null && !sql.isBlank()) {
-			try {
-				results = jdbcTemplate.query(sql, (rs, rowNum) -> {
-					Map<DbQueryOutputField, Object> result = new HashMap<>();
-					
-					ResultSetMetaData metaData = rs.getMetaData();
-					int cols = metaData.getColumnCount();
-					
-					for (int i = 0; i < cols; i++) {
-						Object o = rs.getObject(i + 1);
-						String columnName = metaData.getColumnName(i + 1);
-						String tableName = metaData.getTableName(i + 1);
-						DbQueryOutputField field = new DbQueryOutputField(columnName, tableName, snapAdmin);
-						
-						result.put(field, o);
-					}
-					
-					DbQueryResultRow row = new DbQueryResultRow(result, sql);
-					
-					result.keySet().forEach(f -> {
-						f.setResult(row);
-					});
-					
-					return row;
-				});
-			} catch (TransientDataAccessResourceException | DataIntegrityViolationException e) {
-				// If there's an exception we leave the results as empty
-			} 
-		}
-		return new DbQueryResult(results);
+	@Transactional("internalTransactionManager")
+	public Object createRaw(DbObjectSchema schema, Map<String, Object> values, String primaryKey) {
+		return repository(schema).createRaw(schema, values, primaryKey);
 	}
 	
 	/**
-	 * Delete a specific object
+	 * Find an object by ID, returns the raw result.
+	 * Used internally to retrieve objects programmatically.
+	 * @param schema
+	 * @param id
+	 * @return
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public Optional findRawById(DbObjectSchema schema, Object id) {
+		return repository(schema).findRawById(schema, id);
+	}
+	
+	/**
+	 * Update an existing object with new values, returns the raw result.
+	 * Used internally to update objects programmatically.
+	 * @param schema
+	 * @param id
+	 * @param updates
+	 */
+	@Transactional("internalTransactionManager")
+	public void updateRaw(DbObjectSchema schema, Object id, Map<String, Object> updates) {
+		repository(schema).updateRaw(schema, id, updates);
+	}
+	
+	/**
+	 * Delete an object by primary key, returns the raw result.
+	 * Used internally to delete objects programmatically.
 	 * @param schema
 	 * @param id
 	 */
-	@SuppressWarnings("unchecked")
-	@Transactional("transactionManager")
-	public void delete(DbObjectSchema schema, String id) {
-		schema.getJpaRepository().deleteById(id);
+	@Transactional("internalTransactionManager")
+	public void deleteByIdRaw(DbObjectSchema schema, Object id) {
+		repository(schema).deleteByIdRaw(schema, id);
 	}
 	
+	/**
+	 * Checks if the given object can be safely deleted.
+	 * @param schema
+	 * @param id
+	 * @return
+	 */
+	public boolean canDelete(DbObjectSchema schema, Object id) {
+		return repository(schema).canDelete(schema, id);
+	}
+	
+	/**
+	 * Returns the list of objects that would become orphans if this object was deleted.
+	 * @param schema
+	 * @param id
+	 * @return
+	 */
+	public List<String> getOrphanedObjects(DbObjectSchema schema, Object id) {
+		return repository(schema).getOrphanedObjects(schema, id);
+	}
+	
+	/**
+	 * Returns the list of objects that this object links to.
+	 * @param schema
+	 * @param id
+	 * @return
+	 */
+	public List<String> getLinkedObjects(DbObjectSchema schema, Object id) {
+		return repository(schema).getLinkedObjects(schema, id);
+	}
+	
+	/**
+	 * Returns the list of objects that link to this object.
+	 * @param schema
+	 * @param id
+	 * @return
+	 */
+	public List<String> getReferencingObjects(DbObjectSchema schema, Object id) {
+		return repository(schema).getReferencingObjects(schema, id);
+	}
+	
+	/**
+	 * Returns the list of available query filters for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public Set<QueryFilter> getAvailableFilters(DbObjectSchema schema) {
+		return repository(schema).getAvailableFilters(schema);
+	}
+	
+	/**
+	 * Returns the list of available sort fields for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableSortFields(DbObjectSchema schema) {
+		return repository(schema).getAvailableSortFields(schema);
+	}
+	
+	/**
+	 * Returns the list of available display fields for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableDisplayFields(DbObjectSchema schema) {
+		return repository(schema).getAvailableDisplayFields(schema);
+	}
+	
+	/**
+	 * Returns the list of available search fields for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableSearchFields(DbObjectSchema schema) {
+		return repository(schema).getAvailableSearchFields(schema);
+	}
+	
+	/**
+	 * Returns the list of available filter fields for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableFilterFields(DbObjectSchema schema) {
+		return repository(schema).getAvailableFilterFields(schema);
+	}
+	
+	/**
+	 * Returns the list of available create fields for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableCreateFields(DbObjectSchema schema) {
+		return repository(schema).getAvailableCreateFields(schema);
+	}
+	
+	/**
+	 * Returns the list of available edit fields for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableEditFields(DbObjectSchema schema) {
+		return repository(schema).getAvailableEditFields(schema);
+	}
+	
+	/**
+	 * Returns the list of available export fields for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableExportFields(DbObjectSchema schema) {
+		return repository(schema).getAvailableExportFields(schema);
+	}
+	
+	/**
+	 * Returns the list of available relationship fields for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableRelationshipFields(DbObjectSchema schema) {
+		return repository(schema).getAvailableRelationshipFields(schema);
+	}
+	
+	/**
+	 * Returns the list of available computed columns for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableComputedColumns(DbObjectSchema schema) {
+		return repository(schema).getAvailableComputedColumns(schema);
+	}
+	
+	/**
+	 * Returns the list of available actions for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableActions(DbObjectSchema schema) {
+		return repository(schema).getAvailableActions(schema);
+	}
+	
+	/**
+	 * Returns the list of available batch actions for the schema.
+	 * @param schema
+	 * @return
+	 */
+	public List<String> getAvailableBatchActions(DbObjectSchema schema) {
+		return repository(schema).getAvailableBatchActions(schema);
+	}
+
+	public List<DbObject> search(DbObjectSchema schema, String query) {
+		return repository(schema).search(schema, query, Set.of());
+	}
+
+	/**
+	 * Executes a raw SQL query and returns the result.
+	 * Used for SQL console queries.
+	 * @param query the SQL query to execute
+	 * @return DbQueryResult containing the query results
+	 */
+	public tech.ailef.snapadmin.external.dbmapping.query.DbQueryResult executeQuery(String query) {
+		String executableQuery = stripSqlConsoleComments(query);
+		if (executableQuery.isBlank()) {
+			return new DbQueryResult(0, new ArrayList<>(), new ArrayList<>());
+		}
+
+		// Run the query using JDBC template
+		List<DbQueryResultRow> rows = jdbcTemplate.query(executableQuery, (rs, rowNum) -> {
+			try {
+				Map<DbQueryOutputField, Object> values = new HashMap<>();
+				int columnCount = rs.getMetaData().getColumnCount();
+
+				for (int i = 1; i <= columnCount; i++) {
+					String columnName = rs.getMetaData().getColumnName(i);
+					Object value = rs.getObject(i);
+					// For raw queries, we don't have a schema, so we create a DbQueryOutputField with null table
+					DbQueryOutputField field = new DbQueryOutputField(columnName, null, snapAdmin);
+					values.put(field, value);
+				}
+
+				return new DbQueryResultRow(values, executableQuery);
+			} catch (Exception e) {
+				throw new RuntimeException("Error mapping query result row", e);
+			}
+		});
+
+		// Count query results for pagination
+		long count = 0;
+		try {
+			String countQuery = "SELECT COUNT(*) FROM (" + executableQuery + ") AS count_query";
+			Long result = jdbcTemplate.queryForObject(countQuery, Long.class);
+			count = result != null ? result : 0;
+		} catch (Exception e) {
+			// If count query fails, use the size of the results
+			count = rows.size();
+		}
+
+		List<DbQueryOutputField> fields = new ArrayList<>();
+		if (!rows.isEmpty()) {
+			fields.addAll(rows.get(0).keySet());
+		}
+
+		return new DbQueryResult(count, rows, fields);
+	}
+
+	private String stripSqlConsoleComments(String query) {
+		if (query == null) {
+			return "";
+		}
+
+		return query.lines()
+			.map(String::trim)
+			.filter(line -> !line.isBlank())
+			.filter(line -> !line.startsWith("--"))
+			.reduce((left, right) -> left + "\n" + right)
+			.orElse("");
+	}
 }

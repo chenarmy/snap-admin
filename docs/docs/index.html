@@ -64,12 +64,12 @@
 <div class="separator"></div>
 <h2 id="introduction">1. Introduction</h2>
 
-<p>SnapAdmin is a tool to easily build customizable database management interfaces with CRUD operations (and more!) for Spring Boot+JPA apps.</p>
-<p>It does so by scanning your JPA-annotated <code>@Entity</code> classes and building the required functionality at runtime. Since it won't generate actual code you won't have to change your existing code base, and this makes it easy to integrate. Moreover, every time you update your classes, all changes will be reflected automatically on the web UI. 
+<p>SnapAdmin is a tool to easily build customizable database management interfaces with CRUD operations (and more!) for Spring Boot+MyBatis-Plus apps.</p>
+<p>It does so by scanning your MyBatis-Plus annotated <code>@TableName</code> classes and building the required functionality at runtime. Since it won't generate actual code you won't have to change your existing code base, and this makes it easy to integrate. Moreover, every time you update your classes, all changes will be reflected automatically on the web UI.
 </p>
 <p>On the other hand, this approach requires to interact correctly with all JPA annotations and adapt our behaviour accordingly. This is not an easy task given the large surface area of possible behaviours introduced with annotations and can sometimes introduce bugs. If you encounter problems, please <a href="https://github.com/aileftech/snap-admin/issues" target="_blank">report it as an issue on Github</a>.</p>
 
-<p>The rest of this guide outlines how to install, configure and customize SnapAdmin and, where applicable, it documents known interactions with JPA annotations. If, instead, you are looking for the Javadoc, you can find it <a href="https://javadoc.io/doc/tech.ailef/snap-admin/latest/index.html">here</a>.</p>
+<p>The rest of this guide outlines how to install, configure and customize SnapAdmin and, where applicable, it documents known interactions with MyBatis-Plus annotations. If, instead, you are looking for the Javadoc, you can find it <a href="https://javadoc.io/doc/tech.ailef/snap-admin/latest/index.html">here</a>.</p>
 <div class="separator"></div>
 <h2 id="getting-started">2. Getting started</h2>
 <p>Getting started with SnapAdmin requires including it as a dependency and minimal configuration.</p>
@@ -101,12 +101,9 @@ snapadmin.enabled=true
 ## The first-level part of the URL path: http://localhost:8080/${baseUrl}/
 snapadmin.baseUrl=admin
 
-## The package(s) that contain your @Entity classes
+## The package(s) that contain your @TableName classes
 ## accepts multiple comma separated values
 snapadmin.modelsPackage=your.models.package,your.second.models.package
-
-## At the moment, it's required to have open-in-view set to true.
-# spring.jpa.open-in-view=true
 
 ## OPTIONAL PARAMETERS
 ## Whether to enable SnapAdmin
@@ -138,31 +135,31 @@ snapadmin.modelsPackage=your.models.package,your.second.models.package
 
 <h3 id="supported-features">2.3 Supported features</h3>
 </p>
-<h4 id="supported-annotations">2.3.1 Supported JPA annotations</h4>
+<h4 id="supported-annotations">2.3.1 Supported MyBatis-Plus annotations</h4>
 <ul>
-    <li><b>Core</b>: @Entity, @Table, @Column, @Lob, @Id, @GeneratedValue</li>
+    <li><b>Core</b>: @TableName, @TableId, @TableField, @Lob</li>
     <li><b>Relationships</b>: @OneToMany, @ManyToOne, @ManyToMany, @OneToOne</li>
-    <li><b>Validation</b>: all JPA validation annotations (<code>jakarta.validation.constraints.*</code>)</li>
+    <li><b>Validation</b>: all validation annotations (<code>jakarta.validation.constraints.*</code>)</li>
 </ul>
 <p>The behaviours specified with these annotations should be applied automatically by SnapAdmin. Using non-supported annotations will not necessarily result in an error, as they are simply ignored. Depending on what the annotation actually does, this could be just fine or result in an error if it interferes with something that SnapAdmin relies on.</p>
 
-<p>The following list documents the most significant interactions between JPA annotations and SnapAdmin.</p>
+<p>The following list documents the most significant interactions between MyBatis-Plus annotations and SnapAdmin.</p>
 <table class="table table-striped">
 	<tr>
 		<th><h6 class="m-0 p-0">Annotation name</h6></th>
 		<th><p class="m-0">Description</p></th>
 	</tr>
 	<tr>
-		<td><h6 class="m-0 p-0">@Entity</h6></td>
+		<td><h6 class="m-0 p-0">@TableName</h6></td>
 		<td><p class="m-0">Used to detect the candidate classes to scan.</p></td>
 	</tr>
 	<tr>
-		<td><h6 class="m-0 p-0">@Column</h6></td>
+		<td><h6 class="m-0 p-0">@TableField</h6></td>
 		<td><p class="m-0">Used to detect the column name and its nullability.</p></td>
 	</tr>
 	<tr>
-		<td><h6 class="m-0 p-0">@GeneratedValue</h6></td>
-		<td><p class="m-0">When you have an <code>@Id</code> marked as a <code>@GeneratedValue</code>, you won't be asked to enter it when 
+		<td><h6 class="m-0 p-0">@TableId</h6></td>
+		<td><p class="m-0">When you have a field marked with <code>@TableId</code> with auto generation strategy, you won't be asked to enter it when
 			creating new items, as it will be automatically generated.</p></td>
 	</tr>
 </table>
@@ -193,7 +190,7 @@ snapadmin.modelsPackage=your.models.package,your.second.models.package
 <h2 id="customization">3. Customization</h2>
 <p>There are two ways to customize the appearance and behaviour of SnapAdmin:</p>
 <ol>
-	<li>Applying annotations on your <code>@Entity</code> classes, fields and methods</li>
+	<li>Applying annotations on your <code>@TableName</code> classes, fields and methods</li>
 	<li>Using the Settings panel through the web interface</li>
 </ol>
 <p>Annotations are used primarily to customize behaviour and add custom logic to your classes. If, instead, you're looking to customize appearance of the web UI, it's most likley through the Settings panel.</p>
@@ -320,7 +317,7 @@ private LocalDate createdAt;
 <h4 id="disable-create">3.1.8 @DisableCreate, @DisableEdit, @DisableDelete</h4>
 <h6>Code example</h6>
 <pre >
-<code class="language-java">@Entity
+<code class="language-java">@TableName("product")
 @DisableCreate
 public class Product { ... }</code>
 </pre>
@@ -331,7 +328,7 @@ public class Product { ... }</code>
 <h4 id="disable-export">3.1.9 @DisableExport</h4>
 <h6>Code example</h6>
 <pre >
-<code class="language-java">@Entity
+<code class="language-java">@TableName("user")
 @DisableExport
 public class User { ... }</code>
 </pre>
@@ -342,7 +339,7 @@ public class User { ... }</code>
 <h4 id="disable">3.1.10 @Disable</h4>
 <h6>Code example</h6>
 <pre >
-<code class="language-java">@Entity
+<code class="language-java">@TableName("payment")
 @Disable
 public class Payment { ... }</code>
 </pre>
@@ -437,7 +434,7 @@ You can look at the <a href="https://github.com/aileftech/snap-admin-test/tree/m
 <div class="separator"></div>
 <h2 id="troubleshooting">5. Troubleshooting</h2>
 
-<p>When setting up SnapAdmin for the first time, problems most commonly occur at startup, causing the application to stop. If this is the case, first check that you have correctly configured your <code>application.properties</code> file. If everything is correct here, the problem might be related to one or more of your <code>@Entity</code> classes (or the rest of your code in general) which might be using some unsupported feature and/or annotation. </p>
+<p>When setting up SnapAdmin for the first time, problems most commonly occur at startup, causing the application to stop. If this is the case, first check that you have correctly configured your <code>application.properties</code> file. If everything is correct here, the problem might be related to one or more of your <code>@TableName</code> classes (or the rest of your code in general) which might be using some unsupported feature and/or annotation. </p>
 <p>
 You can enable <code>DEBUG</code>-level logs (e.g. with <code>logging.level.root=DEBUG</code>) to pinpoint the cause error. Looking at those in combination with the stack trace should provide enough information to understand what is going wrong. Keep in mind that if the application doesn't start at all, it's probably a bug: you can <a href="https://github.com/aileftech/snap-admin/issues" target="_blank">open an issue on Github</a>, providing the stacktrace, the debug logs and all other relevant information.</p>
 

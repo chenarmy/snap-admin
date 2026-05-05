@@ -21,7 +21,7 @@ public class ConsoleQuery {
 	@TableId(type = IdType.ASSIGN_UUID)
 	private String id;
 	
-	@TableField("sql")
+	@TableField("`sql`")
 	private String sql;
 	
 	private String title;

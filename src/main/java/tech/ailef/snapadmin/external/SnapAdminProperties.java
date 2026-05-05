@@ -29,7 +29,7 @@ public class SnapAdminProperties {
 	private String baseUrl;
 
 	/**
-	 * The path of the package that contains your JPA `@Entity` or MyBatis-Plus `@TableName` classes to be scanned.
+	 * The path of the package that contains your MyBatis-Plus `@TableName` classes to be scanned.
 	 */
 	private String modelsPackage;
 
@@ -44,10 +44,10 @@ public class SnapAdminProperties {
 	private boolean sqlConsoleEnabled = true;
 
 	/**
-	 * The ORM type to use. Can be JPA or MYBATIS_PLUS.
-	 * Default is JPA for backward compatibility.
+	 * The ORM type to use. Only MYBATIS_PLUS is supported.
+	 * Default is MYBATIS_PLUS.
 	 */
-	private OrmType ormType = OrmType.JPA;
+	private OrmType ormType = OrmType.MYBATIS_PLUS;
 	
 	/**
 	 * Whether SnapAdmin is enabled
@@ -82,7 +82,7 @@ public class SnapAdminProperties {
 	}
 	
 	/**
-	 * Returns the path of the package that contains your JPA `@Entity` classes to be scanned.
+	 * Returns the path of the package that contains your MyBatis-Plus `@TableName` classes to be scanned.
 	 * @return
 	 */
 	public String getModelsPackage() {
@@ -103,7 +103,7 @@ public class SnapAdminProperties {
 	
 	/**
 	 * Returns the ORM type to use.
-	 * @return the ORM type (JPA or MYBATIS_PLUS)
+	 * @return the ORM type (only MYBATIS_PLUS is supported)
 	 */
 	public OrmType getOrmType() {
 		return ormType;
@@ -111,7 +111,7 @@ public class SnapAdminProperties {
 	
 	/**
 	 * Sets the ORM type to use.
-	 * @param ormType the ORM type (JPA or MYBATIS_PLUS)
+	 * @param ormType the ORM type (only MYBATIS_PLUS is supported)
 	 */
 	public void setOrmType(OrmType ormType) {
 		this.ormType = ormType;

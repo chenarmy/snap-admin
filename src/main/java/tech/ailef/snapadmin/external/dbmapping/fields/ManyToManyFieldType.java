@@ -9,7 +9,6 @@ package tech.ailef.snapadmin.external.dbmapping.fields;
 
 import java.util.List;
 
-import jakarta.persistence.ManyToMany;
 import tech.ailef.snapadmin.external.dto.CompareOperator;
 import tech.ailef.snapadmin.external.exceptions.SnapAdminException;
 
@@ -26,7 +25,7 @@ public class ManyToManyFieldType extends DbFieldType {
 
 	@Override
 	public Class<?> getJavaClass() {
-		return ManyToMany.class;
+		return Object.class;
 	}
 	
 	@Override
