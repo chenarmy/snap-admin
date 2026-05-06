@@ -11,7 +11,9 @@ import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -155,8 +157,7 @@ public class SnapAdmin {
 			
 			logger.debug("Processing class: " + klass + " - Table: " + schema.getTableName());
 			
-			Field[] fields = klass.getDeclaredFields();
-			for (Field f : fields) {
+			for (Field f : getAllFields(klass)) {
 				try {
 					DbField field = mapField(f, schema, ormType);
 					field.setSchema(schema);
@@ -237,6 +238,18 @@ public class SnapAdmin {
 			field.setNullable(false);
 		
 		return field;
+	}
+
+	private List<Field> getAllFields(Class<?> klass) {
+		Map<String, Field> fields = new LinkedHashMap<>();
+		Class<?> current = klass;
+		while (current != null && current != Object.class) {
+			for (Field field : current.getDeclaredFields()) {
+				fields.putIfAbsent(field.getName(), field);
+			}
+			current = current.getSuperclass();
+		}
+		return new ArrayList<>(fields.values());
 	}
 
 	public boolean isAuthenticated() {

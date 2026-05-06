@@ -242,7 +242,7 @@ public class DbObject {
 	
 	protected Method findSetter(String fieldName) {
 		String capitalize = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-		Method[] methods = instance.getClass().getDeclaredMethods();
+		Method[] methods = instance.getClass().getMethods();
 		
 		for (Method m : methods) {
 			if (m.getName().equals("set" + capitalize))
@@ -254,7 +254,7 @@ public class DbObject {
 	
 	protected Method findGetter(String fieldName) {
 		String capitalize = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
-		Method[] methods = instance.getClass().getDeclaredMethods();
+		Method[] methods = instance.getClass().getMethods();
 		
 		DbField dbField = schema.getFieldByJavaName(fieldName);
 		if (dbField == null) return null;
