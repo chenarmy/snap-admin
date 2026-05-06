@@ -30,7 +30,7 @@ SnapAdmin 通过 Maven 分发。在 `pom.xml` 中添加以下依赖：
 <dependency>
     <groupId>tech.ailef</groupId>
     <artifactId>snap-admin</artifactId>
-    <version>0.2.2</version>
+    <version>0.2.3</version>
 </dependency>
 
 <!-- MyBatis-Plus 支持（必需） -->
